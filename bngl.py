@@ -26,7 +26,7 @@ class CernetModel:
         self.home = home
         self.plotDir = join(home, 'plots')
         self.name = 'ceRNET_%dx%d_%d_%d' % (m, n, k, index)
-        self.logger.info('Initializing model %d' % index)
+        #self.logger.info('Initializing model %d' % index)
         self.index = index
         self.filePath = join(home, self.name)
         self.bnglFile = self.filePath + '.bngl'

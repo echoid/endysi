@@ -96,7 +96,7 @@ def _writeDataToCSV(filename, data, delim=';', comment='', frmt='%.18e'):
 ### Class definitions ###
 class Experiment:
     def __init__(self, method, model, tEnd, outFreq, logger, debugger, 
-                 pTarget='ceRNA', pProp=2.0):
+                 pTarget='ceRNA', pProp=5.0):
         
         self.logger = logger
         self.debugger = debugger
@@ -115,8 +115,6 @@ class Experiment:
                      'meth': method, 'pcdat': 0, 'ss': 0}
     
     def run(self):
-        self.logger.info('Running simulations on %s' % self.model.name)
-        
         # Initialize simulator
         os.chdir(self.model.home)
         self.simulator.initialize()
@@ -142,6 +140,8 @@ class Experiment:
         newProdRate = oldProdRate * self.perturbProp
         self.simulator.setParameter(param, newProdRate)
         self.simulator.sendAction(self.action % self.opts)
+        self.simulator.close()
+        del self.simulator
     
     def loadData(self):
         # Load data from the two simulations
@@ -233,7 +233,12 @@ class Experiment:
         self.loadData()
         self.calcSteadyStates()
         self.plotTrajectories()
-        self.makeFoldPlots()
+        #self.makeFoldPlots()
+    
+    def deleteData(self):
+        del self.equilData
+        del self.perturbData
+        
 
 
 class Endysi:
@@ -258,6 +263,7 @@ class Endysi:
         self.logger.info('Parameter ranges are as follows:')
         self.logger.info(str(paramDict))
         
+        self.logger.info('Creating models...')
         self.createModels(paramDict)
         self.createExperiments(method, tEnd, outFreq)
     
@@ -299,7 +305,7 @@ class Endysi:
         for i in range(1, self.size+1):
             dDir = join(self.dataDir, 'model%d' % i)
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i, 
-                                     paramDict, self.logger, self.debugger)
+                                     paramDict, self.logger, self.debugger, seed=i)
             
             self.models.append(model)
     
@@ -311,8 +317,10 @@ class Endysi:
     
     def runExperiments(self):
         for experiment in self.experiments:
+            self.logger.info('Running simulations on %s' % experiment.model.name)
             experiment.run()
             experiment.runAnalyses()
+            experiment.deleteData()
     
     def collectSteadyStates(self):
         # Create a table for the steady state values
