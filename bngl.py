@@ -1,5 +1,6 @@
 # bngl stuff for the finally final SimSys version
 
+from __future__ import print_function, division
 import os
 import sys
 import math
@@ -8,24 +9,36 @@ import glob
 import random
 from itertools import combinations
 import networkx as nx
+import matplotlib.pyplot as plt
 import pexpect
 from utilities import *
 
 class CernetModel:
-    def __init__(self, name, rootDir, m, n, k, paramDict, seed=None, volScaling=False):
+    def __init__(self, home, m, n, k, index, paramDict, logger, debugger,
+                 seed=None, volScaling=False):
+        
         if seed != None:
             random.seed(seed)
         
+        self.logger = logger
+        self.debugger = debugger
+        
         self.home = home
-        self.name = name
-        self.path = join(home, name)
-        makeDirs(self.home)
+        self.plotDir = join(home, 'plots')
+        self.name = 'ceRNET_%dx%d_%d_%d' % (m, n, k, index)
+        self.logger.info('Initializing model %d' % index)
+        self.index = index
+        self.filePath = join(home, self.name)
+        self.bnglFile = self.filePath + '.bngl'
+        makeDirs(self.plotDir)
+        
         self.m = m
         self.n = n
         self.k = k
         self.ceRNAs = []
         self.miRNAs = []
         self.complexes = []
+        self.corrMols = {}
         
         self.params = []
         self.molTypes = []
@@ -39,8 +52,17 @@ class CernetModel:
         
         self.writeBNGL()
         self.writeSIF()
+        self.writeGML()
         self.writeParamFile()
+        self.saveNetworkImage()
     
+    def getMolWithName(self, name):
+        for mol in self.molTypes:
+            if mol.name == name:
+                return mol
+        
+        self.debugger.warning('CernetModel.findMolWithName did not find %s' % name)
+        return None
     
     def createMolTypes(self):
         count = 1
@@ -64,7 +86,8 @@ class CernetModel:
     
     def createObservables(self):
         for mol in self.molTypes:
-            self.observables.append(BnglObservable('Molecules', '%s_free' % mol.name, mol.bnglCode))
+            self.observables.append(
+                BnglObservable('Molecules', '%s_free' % mol.name, mol.bnglCode))
     
     def createRulesAndParams(self, paramDict, volScaling=False):
         # Add basic cell params
@@ -78,7 +101,7 @@ class CernetModel:
             minVal = paramDict['pT'][0]
             maxVal = paramDict['pT'][1]
             randVal = random.uniform(minVal, maxVal)
-            param = 'pT%d' % mol.num
+            param = 'pT_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.prodRate = randVal
             
@@ -90,7 +113,7 @@ class CernetModel:
             minVal = paramDict['pR'][0]
             maxVal = paramDict['pR'][1]
             randVal = random.uniform(minVal, maxVal)
-            param = 'pR%d' % mol.num
+            param = 'pR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.prodRate = randVal
             
@@ -103,7 +126,7 @@ class CernetModel:
             minVal = paramDict['dT'][0]
             maxVal = paramDict['dT'][1]
             randVal = random.uniform(minVal, maxVal)
-            param = 'dT%d' % mol.num
+            param = 'dT_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
             
@@ -115,7 +138,7 @@ class CernetModel:
             minVal = paramDict['dR'][0]
             maxVal = paramDict['dR'][1]
             randVal = random.uniform(minVal, maxVal)
-            param = 'dR%d' % mol.num
+            param = 'dR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
             
@@ -134,8 +157,8 @@ class CernetModel:
         
             bRand = random.uniform(bMin, bMax)
             uRand = random.uniform(uMin, uMax)
-            bName = 'b{0}{1}'.format(molX.num, molY.num)
-            uName = 'u{0}{1}'.format(molX.num, molY.num)
+            bName = 'b_{0}_{1}'.format(molX.num, molY.num)
+            uName = 'u_{0}_{1}'.format(molX.num, molY.num)
             if volScaling:
                 self.params.append(BnglParameter(bName, '%s/volScale' % bRand))
             else:
@@ -159,10 +182,10 @@ class CernetModel:
             
             aRand = random.uniform(aMin, aMax)
             cRand = random.uniform(cMin, cMax)
-            aName = 'a{0}{1}'.format(molX.num, molY.num)
-            cName = 'c{0}{1}'.format(molX.num, molY.num)
-            cFname = 'cF{0}{1}'.format(molX.num, molY.num)
-            cPname = 'cP{0}{1}'.format(molX.num, molY.num)
+            aName = 'a_{0}_{1}'.format(molX.num, molY.num)
+            cName = 'c_{0}_{1}'.format(molX.num, molY.num)
+            cFname = 'cF_{0}_{1}'.format(molX.num, molY.num)
+            cPname = 'cP_{0}_{1}'.format(molX.num, molY.num)
             self.params.append(BnglParameter(aName, aRand))
             self.params.append(BnglParameter(cName, cRand))
             self.params.append(BnglParameter(cFname, '%s*%s' % (aName, cName)))
@@ -180,7 +203,7 @@ class CernetModel:
             self.rules.append(BnglDecayRule(comp, cPname, remainder=miRNA.bnglCode))
     
     def writeBNGL(self):
-        with open('%s.bngl' % self.path, 'w') as bnglFile:
+        with open('%s.bngl' % self.filePath, 'w') as bnglFile:
             bnglFile.write('begin model\n')
             bnglFile.write('begin parameters\n')
             for param in self.params:
@@ -205,27 +228,62 @@ class CernetModel:
             bnglFile.write('end model\n')
     
     def writeGML(self):
-        with open('%s.gml' % self.path, 'w') as gmlFile:
-            gmlFile.write('Creator "Y"\n')
-            gmlFile.write('Version 1.0\n')
-            
-            gmlFile.write('graph\n')
-            gmlFile.write('[\n')
+        with open('%s.gml' % self.filePath, 'w') as gmlFile:
+            gmlFile.write('graph [\n')
             gmlFile.write('\tlabel\t"%s"\n' % self.name)
             gmlFile.write('\tdirected\t0\n')
             
             for mol in self.ceRNAs:
-                gmlFile.write('\tnode\n')
+                gmlFile.write('\tnode [\n')
                 gmlFile.write('\t\tid\t%d\n' % mol.id)
-                gmlFile.write('\t\tlabel\t%s\n' % mol.name)
+                gmlFile.write('\t\tlabel\t"%s"\n' % mol.name)
+                gmlFile.write('\t\ttype\t"%s"\n' % 'ceRNA')
+                gmlFile.write('\t\tprodRate\t%f\n' % mol.prodRate)
+                gmlFile.write('\t\tdecayRate\t%f\n' % mol.decayRate)
+                gmlFile.write('\t\tgraphics [\n')
+                gmlFile.write('\t\t\tfill\t"#0006ff"\n')
+                gmlFile.write('\t\t]\t')
+                gmlFile.write('\t]\n')
+            
+            for mol in self.miRNAs:
+                gmlFile.write('\tnode [\n')
+                gmlFile.write('\t\tid\t%d\n' % mol.id)
+                gmlFile.write('\t\tlabel\t"%s"\n' % mol.name)
+                gmlFile.write('\t\ttype\t"%s"\n' % 'miRNA')
+                gmlFile.write('\t\tprodRate\t%f\n' % mol.prodRate)
+                gmlFile.write('\t\tdecayRate\t%f\n' % mol.decayRate)
+                gmlFile.write('\t\tgraphics [\n')
+                gmlFile.write('\t\t\tfill\t"#ff0000"\n')
+                gmlFile.write('\t\t]\t')
+                gmlFile.write('\t]\n')
+            
+            for comp in self.complexes:
+                gmlFile.write('\tedge [\n')
+                gmlFile.write('\t\tsource\t%d\n' % comp.molX.id)
+                gmlFile.write('\t\ttarget\t%d\n' % comp.molY.id)
+                gmlFile.write('\t\tlabel\t"pp"\n')
+                gmlFile.write('\t]\n')
+            
+            gmlFile.write(']\n')
     
     def writeSIF(self):
-        with open('%s.sif' % self.path, 'w') as sifFile:
+        with open('%s.sif' % self.filePath, 'w') as sifFile:
             for comp in self.complexes:
                 sifFile.write('%s binds %s\n' % (comp.molX.name, comp.molY.name))
     
     def writeParamFile(self):
-        pass
+        with open('%s.csv' % self.filePath, 'w') as csvFile:
+            csvFile.write('parameter;value\n')
+            for param in self.params:
+                csvFile.write('%s;%s\n' % (param.name, param.val))
+    
+    def saveNetworkImage(self):
+        gmlFile = self.filePath + '.gml'
+        g = nx.read_gml(gmlFile, relabel=True)
+        p = nx.circular_layout(g)
+        nx.draw_networkx(g, pos=p)
+        plt.savefig(self.filePath + '.png')
+        plt.close()
     
 
 class CeRNA:
@@ -302,23 +360,12 @@ class BnglObservable:
 
 
 class BnglSimulator:
-    def __init__(self, modelFile=None, logging=False, bngex=None):
-        # Create the console
-        #plex = join(os.path.expanduser('~'), '.plenv/shims/perl')
+    def __init__(self, model, logging=True, bngex=None):
+        self.logging = logging
         if bngex == None:
             bngex = join(os.path.expanduser('~'), 'apps/BioNetGen/BNG2.pl')
-        cmd = 'perl %s --console' % bngex
-        self.console = pexpect.spawn(cmd, timeout=30000)
-
-        # Handle logging
-        if logging:
-            self.console.logfile_read = open(join(os.path.expanduser('~'), 'sim_log_read.log'), 'w')
-            #self.console.logfile_send = sys.stdout
-        self.expect()
-
-        # Load model and initialize
-        if not modelFile == None:
-            self.initialize(modelFile)
+        self.cmd = 'perl %s --console' % bngex
+        self.model = model
         
         return
     
@@ -331,10 +378,13 @@ class BnglSimulator:
         self.expect()
         return
 
-    def initialize(self, modelFile):
-        self.loadModel(modelFile)
+    def initialize(self):
+        self.console = pexpect.spawn(self.cmd, timeout=300000)
+        if self.logging:
+            self.console.logfile_read = open(join(self.model.home, 'sim_log.log'), 'w')
+        self.expect()
+        self.loadModel(self.model.bnglFile)
         self.generateNetwork()
-        self.equilibrate()
         return
 
     def generateNetwork(self):
@@ -379,25 +429,26 @@ class BnglSimulator:
         self.console.sendline('done')
 
     def close(self):
-        #self.log.close()
         self.console.close()
         return
 
 ## testing
-if __name__ == '__main__':
-    paramDict = {}
+#if __name__ == '__main__':
+    #paramDict = {}
     
-    paramDict['vol'] = 2.0e-12
-    paramDict['pT'] = (2.4e-3, 2.4e-1)
-    paramDict['pR'] = (2.4e-3, 2.4e-1)
-    paramDict['dT'] = (2.5e-05, 2.5e-03)
-    paramDict['dR'] = (1e-05, 1e-03)
+    #paramDict['vol'] = 2.0e-12
+    #paramDict['pT'] = (2.4e-3, 2.4e-1)
+    #paramDict['pR'] = (2.4e-3, 2.4e-1)
+    #paramDict['dT'] = (2.5e-05, 2.5e-03)
+    #paramDict['dR'] = (1e-05, 1e-03)
 
-    paramDict['b'] = (1e-04, 1e-02)
-    paramDict['u'] = (0, 1)
-    paramDict['c'] = (7e-3, 7e-2)
-    paramDict['a'] = (0.5, 0.5)
+    #paramDict['b'] = (1e-04, 1e-02)
+    #paramDict['u'] = (0, 1)
+    #paramDict['c'] = (7e-3, 7e-2)
+    #paramDict['a'] = (0.5, 0.5)
     
-    cernet10by10 = CernetModel('c10by10', '/home/matt', 10, 10, 10, paramDict, seed=1)
-    
+    #cm = CernetModel('/home/matt/cernettest1', 10, 10, 2, 1, paramDict, None, None, seed=1)
+    ##print(os.path.isfile(cm.bnglFile))
+    ##print(cm.home)
+    ##print(len(cm.complexes))
     
