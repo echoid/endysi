@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 from __future__ import print_function, division
 import os
@@ -26,6 +26,9 @@ def _plotAllTrajectories(filename, data, mols, colours=None, ddpi=120):
     names in the mols argument are of the form 'mol_free', as in the
     output files from the BNG simulation.  Also assumes that the
     filename argument is the full absolute path for the file."""
+
+    if len(mols) == 0:
+        return
 
     if colours is None:
         # colours
@@ -58,6 +61,9 @@ def _plotAllTrajectories(filename, data, mols, colours=None, ddpi=120):
 
 
 def _histogram(filepath, x, xLabel, nBins=20, ddpi=120):
+    if len(x) == 0:
+        return
+
     # Check to make sure filepath doesn't include an extension
     if '.' in filepath:
         i = filepath.index('.')
@@ -124,21 +130,21 @@ class Experiment:
         self.simulator.saveConcentrations()
 
         # Perturbation phase
-        self.opts['suf'] = 'perturb'
-        pMol = None
-        param = None
+        #self.opts['suf'] = 'perturb'
+        #pMol = None
+        #param = None
 
-        if self.perturbTarget == 'miRNA':
-            pMol = self.model.getMolWithName('miRNA1')
-            param = 'pR_1'
-        else:
-            pMol = self.model.getMolWithName('ceRNA1')
-            param = 'pT_1'
+        #if self.perturbTarget == 'miRNA':
+            #pMol = self.model.getMolWithName('miRNA1')
+            #param = 'pR_1'
+        #else:
+            #pMol = self.model.getMolWithName('ceRNA1')
+            #param = 'pT_1'
 
-        oldProdRate = pMol.prodRate
-        newProdRate = oldProdRate * self.perturbProp
-        self.simulator.setParameter(param, newProdRate)
-        self.simulator.sendAction(self.action % self.opts)
+        #oldProdRate = pMol.prodRate
+        #newProdRate = oldProdRate * self.perturbProp
+        #self.simulator.setParameter(param, newProdRate)
+        #self.simulator.sendAction(self.action % self.opts)
         self.simulator.close()
         del self.simulator
 
@@ -146,8 +152,8 @@ class Experiment:
         # Load data from the two simulations
         self.equilData = np.genfromtxt('%s_equil.gdat' % self.model.filePath,
                                        names=True)
-        self.perturbData = np.genfromtxt('%s_perturb.gdat' %
-                                         self.model.filePath, names=True)
+        #self.perturbData = np.genfromtxt('%s_perturb.gdat' %
+        #                                 self.model.filePath, names=True)
 
         # Get and save molecule names
         self.mols = [name for name in self.equilData.dtype.names if
@@ -164,7 +170,7 @@ class Experiment:
         # Create a table for the steady state values
         ssdt = [(mol.split('_')[0], 'f8') for mol in self.mols]
         self.equilSS = np.zeros(1, dtype=ssdt)
-        self.perturbSS = np.zeros(1, dtype=ssdt)
+        #self.perturbSS = np.zeros(1, dtype=ssdt)
 
         # Calculate steady states
         for mol in self.mols:
@@ -172,32 +178,32 @@ class Experiment:
             if self.opts['meth'] == 'ssa':
                 sp = len(self.equilData['time']) - 1000
                 self.equilSS[molName] = np.mean(self.equilData[mol][sp:])
-                self.perturbSS[molName] = np.mean(self.perturbData[mol][sp:])
+                #self.perturbSS[molName] = np.mean(self.perturbData[mol][sp:])
             else:
                 self.equilSS[molName] = self.equilData[mol][-1]
-                self.perturbSS[molName] = self.perturbData[mol][-1]
+                #self.perturbSS[molName] = self.perturbData[mol][-1]
 
         # Write steady states to file
         fn = self.model.filePath + '_equil_steadyStates.csv'
         _writeDataToCSV(fn, self.equilSS)
 
-        fn = self.model.filePath + '_perturb_steadyStates.csv'
-        _writeDataToCSV(fn, self.perturbSS)
+        #fn = self.model.filePath + '_perturb_steadyStates.csv'
+        #_writeDataToCSV(fn, self.perturbSS)
 
     def plotTrajectories(self, ddpi=120):
         # Plot miRNAs
         fn = join(self.model.plotDir, self.model.name + '_miRNA_equil_traj')
         _plotAllTrajectories(fn, self.equilData, self.miRNAs)
 
-        fn = join(self.model.plotDir, self.model.name + '_miRNA_perturb_traj')
-        _plotAllTrajectories(fn, self.perturbData, self.miRNAs)
+        #fn = join(self.model.plotDir, self.model.name + '_miRNA_perturb_traj')
+        #_plotAllTrajectories(fn, self.perturbData, self.miRNAs)
 
         # Plot ceRNAs
         fn = join(self.model.plotDir, self.model.name + '_ceRNA_equil_traj')
         _plotAllTrajectories(fn, self.equilData, self.ceRNAs)
 
-        fn = join(self.model.plotDir, self.model.name + '_ceRNA_perturb_traj')
-        _plotAllTrajectories(fn, self.perturbData, self.ceRNAs)
+        #fn = join(self.model.plotDir, self.model.name + '_ceRNA_perturb_traj')
+        #_plotAllTrajectories(fn, self.perturbData, self.ceRNAs)
 
     def makeFoldPlots(self, ddpi=120):
         # Create colours for the plots
@@ -223,15 +229,15 @@ class Experiment:
         plt.close(fig)
 
         # Perturb data
-        i = 0
-        fig = plt.figure()
-        for pair in self.corrMols['ceRNA']:
-            plt.plot(self.perturbData[pair[0]], self.perturbData[pair[1]],
-                     colours[i])
-            i += 1
-        fn = join(self.model.plotDir, self.model.name + '_perturb_foldPlots.png')
-        plt.savefig(fn, dpi=ddpi, bbox_inches='tight')
-        plt.close(fig)
+        #i = 0
+        #fig = plt.figure()
+        #for pair in self.corrMols['ceRNA']:
+            #plt.plot(self.perturbData[pair[0]], self.perturbData[pair[1]],
+                     #colours[i])
+            #i += 1
+        #fn = join(self.model.plotDir, self.model.name + '_perturb_foldPlots.png')
+        #plt.savefig(fn, dpi=ddpi, bbox_inches='tight')
+        #plt.close(fig)
 
     def runAnalyses(self):
         self.loadData()
@@ -241,19 +247,19 @@ class Experiment:
 
     def deleteData(self):
         del self.equilData
-        del self.perturbData
+        #del self.perturbData
 
 
 class Endysi:
     def __init__(self, m, n, k, size, method, tEnd, outFreq, paramDict,
-                 timestamp=None):
+                 timestamp=None, baseDir=None):
 
         if timestamp is None:
             self.timestamp = genTimeString()
         else:
             self.timestamp = timestamp
 
-        self.name = 'ceRNET_%dx%d_%d' % (m, n, k)
+        self.name = 'ceRNET_%dx%dc%dx%d' % (m, n, k, size)
         self.m = m
         self.n = n
         self.k = k
@@ -261,7 +267,7 @@ class Endysi:
         self.models = []
         self.experiments = []
 
-        self.createDirectories()
+        self.createDirectories(baseDir)
         self.createLoggers()
         msg = 'Initializing system to run {0} networks with M={1}, N={2}, K={3}'
         self.logger.info(msg.format(size, m, n, k))
@@ -297,9 +303,13 @@ class Endysi:
         self.logger.addHandler(fh)
         self.debugger.addHandler(ch)
 
-    def createDirectories(self):
-        self.rootDir = join(os.path.expanduser('~'),
+    def createDirectories(self, baseDir):
+        if baseDir is None:
+            self.rootDir = join(os.path.expanduser('~'),
                             'research/results/ceRNA/endysi/' + self.name)
+        else:
+            self.rootDir = join(baseDir, self.name)
+
         self.curRun = join(self.rootDir, self.timestamp)
         self.dataDir = join(self.curRun, 'data')
         self.resultsDir = join(self.curRun, 'results')
@@ -340,22 +350,22 @@ class Endysi:
         ssdt = [(name, 'f8') for name in names]
         ssdt.insert(0, ('model', 'i4'))
         self.equilSS = np.zeros(self.size, dtype=ssdt)
-        self.perturbSS = np.zeros(self.size, dtype=ssdt)
+        #self.perturbSS = np.zeros(self.size, dtype=ssdt)
 
         for experiment in self.experiments:
             i = experiment.model.index
             self.equilSS['model'][i - 1] = i
-            self.perturbSS['model'][i - 1] = i
+            #self.perturbSS['model'][i - 1] = i
             for name in names:
                 self.equilSS[name][i - 1] = experiment.equilSS[name][0]
-                self.perturbSS[name][i - 1] = experiment.perturbSS[name][0]
+                #self.perturbSS[name][i - 1] = experiment.perturbSS[name][0]
 
         # Write to file
         fn = join(self.resultsDir, self.name + '_equil_steadyStates.csv')
         _writeDataToCSV(fn, self.equilSS)
 
-        fn = join(self.resultsDir, self.name + '_perturb_steadyStates.csv')
-        _writeDataToCSV(fn, self.perturbSS)
+        #fn = join(self.resultsDir, self.name + '_perturb_steadyStates.csv')
+        #_writeDataToCSV(fn, self.perturbSS)
 
     def calcCrossConditionCorrelations(self):
         # Pair up molecules for correlations
@@ -368,12 +378,12 @@ class Endysi:
         # Create tables for results
         self.ceEquilCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
                                                 ('r', 'f8'), ('p', 'f8')])
-        self.cePerturbCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
-                                                ('r', 'f8'), ('p', 'f8')])
+        #self.cePerturbCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
+                                                #('r', 'f8'), ('p', 'f8')])
         self.miEquilCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
                                                 ('r', 'f8'), ('p', 'f8')])
-        self.miPerturbCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
-                                                ('r', 'f8'), ('p', 'f8')])
+        #self.miPerturbCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
+                                                #('r', 'f8'), ('p', 'f8')])
 
         # Do the calculations
 
@@ -399,24 +409,24 @@ class Endysi:
             count += 1
 
         # Perturb steady states
-        count = 0
-        for pair in cePairs:
-            mol1 = pair[0]
-            mol2 = pair[1]
-            mol1data = self.perturbSS[mol1]
-            mol2data = self.perturbSS[mol2]
+        #count = 0
+        #for pair in cePairs:
+            #mol1 = pair[0]
+            #mol2 = pair[1]
+            #mol1data = self.perturbSS[mol1]
+            #mol2data = self.perturbSS[mol2]
 
-            (r, p) = pearsonr(mol1data, mol2data)
+            #(r, p) = pearsonr(mol1data, mol2data)
 
-            if math.isnan(r):
-                r = 0.0
+            #if math.isnan(r):
+                #r = 0.0
 
-            pairString = '(%s, %s)' % (mol1, mol2)
-            self.cePerturbCCs['mol pair'][count] = pairString
-            self.cePerturbCCs['r'][count] = r
-            self.cePerturbCCs['p'][count] = p
+            #pairString = '(%s, %s)' % (mol1, mol2)
+            #self.cePerturbCCs['mol pair'][count] = pairString
+            #self.cePerturbCCs['r'][count] = r
+            #self.cePerturbCCs['p'][count] = p
 
-            count += 1
+            #count += 1
 
         # miRNAs
         # Equil steady states
@@ -440,50 +450,50 @@ class Endysi:
             count += 1
 
         # Perturb steady states
-        count = 0
-        for pair in miPairs:
-            mol1 = pair[0]
-            mol2 = pair[1]
-            mol1data = self.perturbSS[mol1]
-            mol2data = self.perturbSS[mol2]
+        #count = 0
+        #for pair in miPairs:
+            #mol1 = pair[0]
+            #mol2 = pair[1]
+            #mol1data = self.perturbSS[mol1]
+            #mol2data = self.perturbSS[mol2]
 
-            (r, p) = pearsonr(mol1data, mol2data)
+            #(r, p) = pearsonr(mol1data, mol2data)
 
-            if math.isnan(r):
-                r = 0.0
+            #if math.isnan(r):
+                #r = 0.0
 
-            pairString = '(%s, %s)' % (mol1, mol2)
-            self.miPerturbCCs['mol pair'][count] = pairString
-            self.miPerturbCCs['r'][count] = r
-            self.miPerturbCCs['p'][count] = p
+            #pairString = '(%s, %s)' % (mol1, mol2)
+            #self.miPerturbCCs['mol pair'][count] = pairString
+            #self.miPerturbCCs['r'][count] = r
+            #self.miPerturbCCs['p'][count] = p
 
-            count += 1
+            #count += 1
 
         # Write results to files
         fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCs.csv')
         _writeDataToCSV(fn, self.ceEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
 
-        fn = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs.csv')
-        _writeDataToCSV(fn, self.cePerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
+        #fn = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs.csv')
+        #_writeDataToCSV(fn, self.cePerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
 
         fn = join(self.resultsDir, self.name + '_miRNA_equil_CCs.csv')
         _writeDataToCSV(fn, self.miEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
 
-        fn = join(self.resultsDir, self.name + '_miRNA_perturb_CCs.csv')
-        _writeDataToCSV(fn, self.miPerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
+        #fn = join(self.resultsDir, self.name + '_miRNA_perturb_CCs.csv')
+        #_writeDataToCSV(fn, self.miPerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
 
         # Make histograms
         fp = join(self.resultsDir, self.name + '_ceRNA_equil_CCs_hist')
         _histogram(fp, self.ceEquilCCs['r'], 'r')
 
-        fp = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs_hist')
-        _histogram(fp, self.cePerturbCCs['r'], 'r')
+        #fp = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs_hist')
+        #_histogram(fp, self.cePerturbCCs['r'], 'r')
 
         fp = join(self.resultsDir, self.name + '_miRNA_equil_CCs_hist')
         _histogram(fp, self.miEquilCCs['r'], 'r')
 
-        fp = join(self.resultsDir, self.name + '_miRNA_perturb_CCs_hist')
-        _histogram(fp, self.miPerturbCCs['r'], 'r')
+        #fp = join(self.resultsDir, self.name + '_miRNA_perturb_CCs_hist')
+        #_histogram(fp, self.miPerturbCCs['r'], 'r')
 
     def runAnalyses(self):
         self.collectSteadyStates()
@@ -496,46 +506,103 @@ class Endysi:
         tEnd = time.time()
         tElapsed = tEnd - tStart
         self.logger.info('Time elapsed %.3f' % tElapsed)
-        print('Time elapsed %.3f' % tElapsed)
+        #print('Time elapsed %.3f' % tElapsed)
 
 
 class Population:
-    def __init__(self, m, n, k, s, p, method, tEnd, outFreq, paramDict):
+    def __init__(self, p, m, n, k, s, method, tEnd, outFreq, paramDict,
+                 timestamp=None):
+
+        if timestamp is None:
+            self.timestamp = genTimeString()
+        else:
+            self.timestamp = timestamp
+
         self.m = m
         self.n = n
         self.k = k
         self.s = s
         self.p = p
+        self.name = 'Pop@%d_%dx%dc%dx%d' % (p, m, n, k, s)
 
         self.createDirectories()
-        self.createEnsembles()
+        self.createLoggers()
+        msg = 'Initializing population of size %d, with %d %dx%dx%d ensembles ' % (p, s, m, n, k)
+        self.logger.info(msg)
+        self.createEnsembles(m, n, k, s, method, tEnd, outFreq, paramDict)
         self.runAll()
         self.runAnalysis()
 
     def createDirectories(self):
-        d = 'Pop%dX%d_%d' % (self.m, self.n, self.k)
         self.rootDir = join(os.path.expanduser('~'),
-                            'research/results/ceRNA/endysi/' + d)
-        makeDirs(self.rootDir)
+                            'research/results/ceRNA/endysi/' + self.name)
+
+        self.curRun = join(self.rootDir, self.timestamp)
+        self.dataDir = join(self.curRun, 'data')
+        self.resultsDir = join(self.curRun, 'results')
+        makeDirs(self.dataDir)
+        makeDirs(self.resultsDir)
 
     def createEnsembles(self, m, n, k, s, method, tEnd, outFreq, paramDict):
+        self.logger.info('Creating ensembles')
         self.ensembles = []
         for i in range(self.p):
             self.ensembles.append(Endysi(m, n, k, s, method, tEnd,
-                                  outFreq, paramDict))
+                                  outFreq, paramDict, baseDir=self.dataDir))
+
+    def createLoggers(self):
+        # create loggers and set levels
+        self.debugger = logging.getLogger('debugger')
+        self.debugger.setLevel(_debugLevel)
+        self.logger = logging.getLogger('logger')
+        self.logger.setLevel(logging.INFO)
+
+        # create file handler which writes important events to a log file
+        filename = join(self.curRun, 'run_log.log')
+        fh = logging.FileHandler(filename, mode='w')
+        fh.setLevel(logging.INFO)
+
+        # create console handler for writing debugging messages to the console
+        ch = logging.StreamHandler()
+        ch.setLevel(_debugLevel)
+
+        # create formatter and add it to the handlers
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
+
+        # add the handlers to the logger
+        self.logger.addHandler(fh)
+        self.debugger.addHandler(ch)
 
     def runAll(self):
+        i = 1
         for e in self.ensembles:
+            print('running ensemble %d' % i)
+            self.logger.info('Running simulations on ' + e.name)
             e.runAll()
+            i += 1
+
+        self.runAnalysis()
 
     def runAnalysis(self):
+        rVals = []
         for e in self.ensembles:
             fn = e.name + '_ceRNA_equil_CCs.csv'
+            da = np.genfromtxt(join(e.resultsDir, fn), delimiter=';', names=True)
+            rVals.extend(da['r'])
+
+        fp = join(self.resultsDir, self.name + '_allCorrs')
+        _histogram(fp, rVals, 'r')
+
+        print('# of r vals = %d' % len(rVals))
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('-p', type=int, default=1,
+                        help='The size of the population of ensembles')
     parser.add_argument('-m', type=int, help='The number of miRNAs')
     parser.add_argument('-n', type=int, help='The number of ceRNAs')
     parser.add_argument('-k', type=int, help='The degree of each ceRNA')
@@ -567,8 +634,11 @@ if __name__ == '__main__':
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
-    eds = Endysi(args.m, args.n, args.k, args.s, args.method, tEnd,
-                 outFreq, paramDict)
-
-    eds.runAll()
-
+    if args.p == 1:
+        eds = Endysi(args.m, args.n, args.k, args.s, args.method, tEnd,
+                     outFreq, paramDict)
+        eds.runAll()
+    else:
+        p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
+                       tEnd, outFreq, paramDict)
+        p.runAll()
