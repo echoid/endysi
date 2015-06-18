@@ -10,14 +10,11 @@ from utilities import *
 
 
 class CernetModel:
-    def __init__(self, home, m, n, k, index, paramDict, logger, debugger,
-                 seed=None, volScaling=False, template=None):
+    def __init__(self, home, m, n, k, index, paramDict, seed=None,
+                 volScaling=False, template=None):
 
         if seed is not None:
             random.seed(seed)
-
-        self.logger = logger
-        self.debugger = debugger
 
         self.home = home
         self.plotDir = join(home, 'plots')
@@ -54,24 +51,14 @@ class CernetModel:
         self.createRulesAndParams(paramDict)
 
         self.writeNetworkFiles()
+        #self.writeBNGL()
 
     def writeNetworkFiles(self):
         self.writeBNGL()
         self.writeSIF()
         self.writeGML()
         self.writeParamFile()
-        self.saveNetworkImage()
-
-    def copy(self, source, home, index, paramDict, seed):
-        m = source.m
-        n = source.n
-        k = source.k
-        logger = source.logger
-        debugger = source.debugger
-        c = CernetModel(home, m, n, k, index, paramDict, logger, debugger,
-                        seed=seed, template=source)
-
-        return c
+        #self.saveNetworkImage()
 
     def getMolWithName(self, name):
         for mol in self.molTypes:

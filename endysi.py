@@ -13,8 +13,11 @@ from scipy.stats import pearsonr
 import bngl
 from utilities import *
 
-# Global debugging level:
+# Global debugging level
 _debugLevel = logging.INFO  # use logging.INFO to turn off debugging
+
+# Global logging switch
+_logging = False
 
 # Global dpi for plots
 _dpi = 120
@@ -100,11 +103,8 @@ def _writeDataToCSV(filename, data, delim=';', comment='', frmt='%.18e'):
 
 ### Class definitions ###
 class Experiment:
-    def __init__(self, method, model, tEnd, outFreq, logger, debugger,
-                 pTarget='ceRNA', pProp=5.0):
+    def __init__(self, method, model, tEnd, outFreq, pTarget='ceRNA', pProp=5.0):
 
-        self.logger = logger
-        self.debugger = debugger
         self.model = model
         self.simulator = bngl.BnglSimulator(model)
         self.perturbTarget = pTarget
@@ -118,6 +118,7 @@ class Experiment:
         nsteps = int(tEnd / outFreq)
         self.opts = {'suf': 'sim', 'tend': tEnd, 'nsteps': nsteps, 'cnt': 0,
                      'meth': method, 'pcdat': 0, 'ss': 0}
+        return
 
     def run(self):
         # Initialize simulator
@@ -147,6 +148,7 @@ class Experiment:
         #self.simulator.sendAction(self.action % self.opts)
         self.simulator.close()
         del self.simulator
+        return
 
     def loadData(self):
         # Load data from the two simulations
@@ -165,6 +167,7 @@ class Experiment:
         self.corrMols = {}
         self.corrMols['ceRNA'] = list(combinations(self.ceRNAs, 2))
         self.corrMols['miRNA'] = list(combinations(self.miRNAs, 2))
+        return
 
     def calcSteadyStates(self):
         # Create a table for the steady state values
@@ -189,6 +192,7 @@ class Experiment:
 
         #fn = self.model.filePath + '_perturb_steadyStates.csv'
         #_writeDataToCSV(fn, self.perturbSS)
+        return
 
     def plotTrajectories(self, ddpi=120):
         # Plot miRNAs
@@ -204,6 +208,7 @@ class Experiment:
 
         #fn = join(self.model.plotDir, self.model.name + '_ceRNA_perturb_traj')
         #_plotAllTrajectories(fn, self.perturbData, self.ceRNAs)
+        return
 
     def makeFoldPlots(self, ddpi=120):
         # Create colours for the plots
@@ -238,19 +243,22 @@ class Experiment:
         #fn = join(self.model.plotDir, self.model.name + '_perturb_foldPlots.png')
         #plt.savefig(fn, dpi=ddpi, bbox_inches='tight')
         #plt.close(fig)
+        return
 
     def runAnalyses(self):
         self.loadData()
         self.calcSteadyStates()
         self.plotTrajectories()
         #self.makeFoldPlots()
+        return
 
     def deleteData(self):
         del self.equilData
         #del self.perturbData
+        return
 
 
-class Endysi:
+class Ensemble:
     def __init__(self, m, n, k, size, method, tEnd, outFreq, paramDict,
                  timestamp=None, baseDir=None):
 
@@ -268,15 +276,19 @@ class Endysi:
         self.experiments = []
 
         self.createDirectories(baseDir)
-        self.createLoggers()
-        msg = 'Initializing system to run {0} networks with M={1}, N={2}, K={3}'
-        self.logger.info(msg.format(size, m, n, k))
-        self.logger.info('Parameter ranges are as follows:')
-        self.logger.info(str(paramDict))
 
-        self.logger.info('Creating models...')
+        if _logging:
+            self.createLoggers()
+            msg = 'Initializing system to run {0} networks with M={1}, N={2}, K={3}'
+            self.logger.info(msg.format(size, m, n, k))
+            self.logger.info('Parameter ranges are as follows:')
+            self.logger.info(str(paramDict))
+
+            self.logger.info('Creating models...')
+
         self.createModels(paramDict)
         self.createExperiments(method, tEnd, outFreq)
+        return
 
     def createLoggers(self):
         # create loggers and set levels
@@ -302,11 +314,12 @@ class Endysi:
         # add the handlers to the logger
         self.logger.addHandler(fh)
         self.debugger.addHandler(ch)
+        return
 
     def createDirectories(self, baseDir):
         if baseDir is None:
             self.rootDir = join(os.path.expanduser('~'),
-                            'research/results/ceRNA/endysi/' + self.name)
+                                'research/results/ceRNA/endysi/' + self.name)
         else:
             self.rootDir = join(baseDir, self.name)
 
@@ -315,34 +328,31 @@ class Endysi:
         self.resultsDir = join(self.curRun, 'results')
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
+        return
 
     def createModels(self, paramDict):
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, self.logger, self.debugger,
-                                     seed=None)
+                                     paramDict, seed=None)
 
             self.models.append(model)
-
-    #def createModelsFromTemplate(self, paramDict):
-        #tDir = join(self.dataDir, 'template')
-        #template = bngl.CernetModel(tDir, self.m, self.n, self.k, 0,
-                                    #paramDict, self.logger, self.debugger,
-                                    #seed=0)
+        return
 
     def createExperiments(self, method, tEnd, outFreq):
         for model in self.models:
-            e = Experiment(method, model, tEnd, outFreq, self.logger,
-                           self.debugger)
+            e = Experiment(method, model, tEnd, outFreq)
             self.experiments.append(e)
 
     def runExperiments(self):
         for experiment in self.experiments:
-            self.logger.info('Running simulations on %s' % experiment.model.name)
+            if _logging:
+                self.logger.info('Running simulations on %s' % experiment.model.name)
+
             experiment.run()
             experiment.runAnalyses()
             experiment.deleteData()
+        return
 
     def collectSteadyStates(self):
         # Create a table for the steady state values
@@ -366,6 +376,7 @@ class Endysi:
 
         #fn = join(self.resultsDir, self.name + '_perturb_steadyStates.csv')
         #_writeDataToCSV(fn, self.perturbSS)
+        return
 
     def calcCrossConditionCorrelations(self):
         # Pair up molecules for correlations
@@ -494,10 +505,12 @@ class Endysi:
 
         #fp = join(self.resultsDir, self.name + '_miRNA_perturb_CCs_hist')
         #_histogram(fp, self.miPerturbCCs['r'], 'r')
+        return
 
     def runAnalyses(self):
         self.collectSteadyStates()
         self.calcCrossConditionCorrelations()
+        return
 
     def runAll(self):
         tStart = time.time()
@@ -505,8 +518,10 @@ class Endysi:
         self.runAnalyses()
         tEnd = time.time()
         tElapsed = tEnd - tStart
-        self.logger.info('Time elapsed %.3f' % tElapsed)
+        if _logging:
+            self.logger.info('Time elapsed %.3f' % tElapsed)
         #print('Time elapsed %.3f' % tElapsed)
+        return
 
 
 class Population:
@@ -524,14 +539,17 @@ class Population:
         self.s = s
         self.p = p
         self.name = 'Pop@%d_%dx%dc%dx%d' % (p, m, n, k, s)
-
         self.createDirectories()
-        self.createLoggers()
-        msg = 'Initializing population of size %d, with %d %dx%dx%d ensembles ' % (p, s, m, n, k)
-        self.logger.info(msg)
+
+        if _logging:
+            self.createLoggers()
+            msg = 'Initializing population of size %d, with %d %dx%dx%d ensembles ' % (p, s, m, n, k)
+            self.logger.info(msg)
+
         self.createEnsembles(m, n, k, s, method, tEnd, outFreq, paramDict)
         self.runAll()
         self.runAnalysis()
+        return
 
     def createDirectories(self):
         self.rootDir = join(os.path.expanduser('~'),
@@ -542,13 +560,17 @@ class Population:
         self.resultsDir = join(self.curRun, 'results')
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
+        return
 
     def createEnsembles(self, m, n, k, s, method, tEnd, outFreq, paramDict):
-        self.logger.info('Creating ensembles')
+        if _logging:
+            self.logger.info('Creating ensembles')
         self.ensembles = []
         for i in range(self.p):
-            self.ensembles.append(Endysi(m, n, k, s, method, tEnd,
-                                  outFreq, paramDict, baseDir=self.dataDir))
+            self.ensembles.append(Ensemble(m, n, k, s, method, tEnd,
+                                  outFreq, paramDict, baseDir=self.dataDir,
+                                  timestamp='e%d' % (i + 1)))
+        return
 
     def createLoggers(self):
         # create loggers and set levels
@@ -558,7 +580,7 @@ class Population:
         self.logger.setLevel(logging.INFO)
 
         # create file handler which writes important events to a log file
-        filename = join(self.curRun, 'run_log.log')
+        filename = join(self.curRun, 'pop_log.log')
         fh = logging.FileHandler(filename, mode='w')
         fh.setLevel(logging.INFO)
 
@@ -574,16 +596,19 @@ class Population:
         # add the handlers to the logger
         self.logger.addHandler(fh)
         self.debugger.addHandler(ch)
+        return
 
     def runAll(self):
         i = 1
         for e in self.ensembles:
             print('running ensemble %d' % i)
-            self.logger.info('Running simulations on ' + e.name)
+            if _logging:
+                self.logger.info('Running simulations on ' + e.name)
             e.runAll()
             i += 1
 
         self.runAnalysis()
+        return
 
     def runAnalysis(self):
         rVals = []
@@ -596,6 +621,7 @@ class Population:
         _histogram(fp, rVals, 'r')
 
         print('# of r vals = %d' % len(rVals))
+        return
 
 
 if __name__ == '__main__':
@@ -607,7 +633,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', type=int, help='The number of ceRNAs')
     parser.add_argument('-k', type=int, help='The degree of each ceRNA')
     parser.add_argument('-s', type=int,
-                        help='The number of models in the ensemble')
+                        help='The number of models in each ensemble')
     parser.add_argument('--method', type=str,
                         help='Simulation method: ode or ssa')
     args = parser.parse_args()
@@ -635,7 +661,7 @@ if __name__ == '__main__':
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
     if args.p == 1:
-        eds = Endysi(args.m, args.n, args.k, args.s, args.method, tEnd,
+        eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
                      outFreq, paramDict)
         eds.runAll()
     else:
