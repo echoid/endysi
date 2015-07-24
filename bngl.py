@@ -38,13 +38,6 @@ class CernetModel:
         self.observables = []
         self.rules = []
 
-        if template is not None:
-            self.ceRNAs = list(template.ceRNAs)
-            self.miRNAs = list(template.miRNAs)
-            self.molTypes = list(template.molTypes)
-            self.complexes = list(template.complexes)
-            self.observables = list(template.observables)
-
         self.createMolTypes()
         self.createComplexes()
         self.createObservables()
@@ -53,10 +46,20 @@ class CernetModel:
         self.writeNetworkFiles()
         #self.writeBNGL()
 
+    def purge(self):
+        del self.ceRNAs
+        del self.miRNAs
+        del self.complexes
+        del self.corrMols
+        del self.params
+        del self.molTypes
+        del self.observables
+        del self.rules
+
     def writeNetworkFiles(self):
         self.writeBNGL()
-        self.writeSIF()
-        self.writeGML()
+        #self.writeSIF()
+        #self.writeGML()
         self.writeParamFile()
         #self.saveNetworkImage()
 
@@ -90,7 +93,7 @@ class CernetModel:
                 self.complexes.append(BnglComplex(ceRNA, reg))
 
     def createObservables(self):
-        for mol in self.molTypes:
+        for mol in self.ceRNAs:
             self.observables.append(
                 BnglObservable('Molecules', '%s_free' % mol.name, mol.bnglCode))
 

@@ -84,7 +84,7 @@ def _histogram(filepath, x, xLabel, nBins=20, ddpi=120):
     histData = np.zeros(nBins, dtype=[('bin', 'f8'), ('count', 'f8')])
     np.copyto(histData['bin'], bins[:len(counts)])
     np.copyto(histData['count'], counts)
-    _writeDataToCSV(filepath + '.csv', histData)
+    _writeDataToCSV(filepath + '_hist.csv', histData)
 
 
 def _plotAndSave(filename, x, y, xLabel, yLabel, ddpi=120):
@@ -99,6 +99,13 @@ def _writeDataToCSV(filename, data, delim=';', comment='', frmt='%.18e'):
 
     np.savetxt(filename, data, delimiter=delim, header=head,
                comments=comment, fmt=frmt)
+
+
+def _writeListToCSV(filename, data, name):
+    with open(filename, 'w') as f:
+        f.write('%s;\n' % name)
+        for item in data:
+            f.write('%f;\n' % item)
 
 
 ### Class definitions ###
@@ -119,6 +126,14 @@ class Experiment:
         self.opts = {'suf': 'sim', 'tend': tEnd, 'nsteps': nsteps, 'cnt': 0,
                      'meth': method, 'pcdat': 0, 'ss': 0}
         return
+
+    def purge(self):
+        del self.simulator
+        del self.action
+        del self.perturbProp
+        del self.perturbTarget
+        del self.opts
+        self.model.purge()
 
     def run(self):
         # Initialize simulator
@@ -147,7 +162,7 @@ class Experiment:
         #self.simulator.setParameter(param, newProdRate)
         #self.simulator.sendAction(self.action % self.opts)
         self.simulator.close()
-        del self.simulator
+
         return
 
     def loadData(self):
@@ -248,8 +263,9 @@ class Experiment:
     def runAnalyses(self):
         self.loadData()
         self.calcSteadyStates()
-        self.plotTrajectories()
+        #self.plotTrajectories()
         #self.makeFoldPlots()
+        #self.deleteData()
         return
 
     def deleteData(self):
@@ -272,6 +288,9 @@ class Ensemble:
         self.n = n
         self.k = k
         self.size = size
+        self.method = method
+        self.tEnd = tEnd
+        self.outFreq = outFreq
         self.models = []
         self.experiments = []
 
@@ -286,8 +305,8 @@ class Ensemble:
 
             self.logger.info('Creating models...')
 
-        self.createModels(paramDict)
-        self.createExperiments(method, tEnd, outFreq)
+        #self.createModels(paramDict)
+        #self.createExperiments(method, tEnd, outFreq)
         return
 
     def createLoggers(self):
@@ -329,6 +348,19 @@ class Ensemble:
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
         return
+
+    def doit(self):
+        for i in range(1, self.size + 1):
+            dDir = join(self.dataDir, 'model%d' % i)
+            model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
+                                     paramDict, seed=None)
+
+            e = Experiment(self.method, model, self.tEnd, self.outFreq)
+            e.run()
+            e.runAnalyses()
+            e.deleteData()
+            e.purge()
+            self.experiments.append(e)
 
     def createModels(self, paramDict):
         for i in range(1, self.size + 1):
@@ -382,17 +414,17 @@ class Ensemble:
         # Pair up molecules for correlations
         names = self.experiments[0].equilSS.dtype.names
         ceRNAs = [name for name in names if 'ceRNA' in name]
-        miRNAs = [name for name in names if 'miRNA' in name]
+        #miRNAs = [name for name in names if 'miRNA' in name]
         cePairs = list(combinations(ceRNAs, 2))
-        miPairs = list(combinations(miRNAs, 2))
+        #miPairs = list(combinations(miRNAs, 2))
 
         # Create tables for results
         self.ceEquilCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
                                                 ('r', 'f8'), ('p', 'f8')])
         #self.cePerturbCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
                                                 #('r', 'f8'), ('p', 'f8')])
-        self.miEquilCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
-                                                ('r', 'f8'), ('p', 'f8')])
+        #self.miEquilCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
+                                                #('r', 'f8'), ('p', 'f8')])
         #self.miPerturbCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
                                                 #('r', 'f8'), ('p', 'f8')])
 
@@ -441,24 +473,24 @@ class Ensemble:
 
         # miRNAs
         # Equil steady states
-        count = 0
-        for pair in miPairs:
-            mol1 = pair[0]
-            mol2 = pair[1]
-            mol1data = self.equilSS[mol1]
-            mol2data = self.equilSS[mol2]
+        #count = 0
+        #for pair in miPairs:
+            #mol1 = pair[0]
+            #mol2 = pair[1]
+            #mol1data = self.equilSS[mol1]
+            #mol2data = self.equilSS[mol2]
 
-            (r, p) = pearsonr(mol1data, mol2data)
+            #(r, p) = pearsonr(mol1data, mol2data)
 
-            if math.isnan(r):
-                r = 0.0
+            #if math.isnan(r):
+                #r = 0.0
 
-            pairString = '(%s, %s)' % (mol1, mol2)
-            self.miEquilCCs['mol pair'][count] = pairString
-            self.miEquilCCs['r'][count] = r
-            self.miEquilCCs['p'][count] = p
+            #pairString = '(%s, %s)' % (mol1, mol2)
+            #self.miEquilCCs['mol pair'][count] = pairString
+            #self.miEquilCCs['r'][count] = r
+            #self.miEquilCCs['p'][count] = p
 
-            count += 1
+            #count += 1
 
         # Perturb steady states
         #count = 0
@@ -487,21 +519,21 @@ class Ensemble:
         #fn = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs.csv')
         #_writeDataToCSV(fn, self.cePerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
 
-        fn = join(self.resultsDir, self.name + '_miRNA_equil_CCs.csv')
-        _writeDataToCSV(fn, self.miEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
+        #fn = join(self.resultsDir, self.name + '_miRNA_equil_CCs.csv')
+        #_writeDataToCSV(fn, self.miEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
 
         #fn = join(self.resultsDir, self.name + '_miRNA_perturb_CCs.csv')
         #_writeDataToCSV(fn, self.miPerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
 
         # Make histograms
-        fp = join(self.resultsDir, self.name + '_ceRNA_equil_CCs_hist')
-        _histogram(fp, self.ceEquilCCs['r'], 'r')
+        #fp = join(self.resultsDir, self.name + '_ceRNA_equil_CCs_hist')
+        #_histogram(fp, self.ceEquilCCs['r'], 'r')
 
         #fp = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs_hist')
         #_histogram(fp, self.cePerturbCCs['r'], 'r')
 
-        fp = join(self.resultsDir, self.name + '_miRNA_equil_CCs_hist')
-        _histogram(fp, self.miEquilCCs['r'], 'r')
+        #fp = join(self.resultsDir, self.name + '_miRNA_equil_CCs_hist')
+        #_histogram(fp, self.miEquilCCs['r'], 'r')
 
         #fp = join(self.resultsDir, self.name + '_miRNA_perturb_CCs_hist')
         #_histogram(fp, self.miPerturbCCs['r'], 'r')
@@ -514,7 +546,18 @@ class Ensemble:
 
     def runAll(self):
         tStart = time.time()
-        self.runExperiments()
+        for i in range(1, self.size + 1):
+            dDir = join(self.dataDir, 'model%d' % i)
+            model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
+                                     paramDict, seed=None)
+
+            e = Experiment(self.method, model, self.tEnd, self.outFreq)
+            e.run()
+            e.runAnalyses()
+            e.deleteData()
+            e.purge()
+            self.experiments.append(e)
+
         self.runAnalyses()
         tEnd = time.time()
         tElapsed = tEnd - tStart
@@ -538,7 +581,12 @@ class Population:
         self.k = k
         self.s = s
         self.p = p
+        self.method = method
+        self.tEnd = tEnd
+        self.outFreq = outFreq
+        self.paramDict = paramDict
         self.name = 'Pop@%d_%dx%dc%dx%d' % (p, m, n, k, s)
+        self.ensembles = []
         self.createDirectories()
 
         if _logging:
@@ -546,9 +594,7 @@ class Population:
             msg = 'Initializing population of size %d, with %d %dx%dx%d ensembles ' % (p, s, m, n, k)
             self.logger.info(msg)
 
-        self.createEnsembles(m, n, k, s, method, tEnd, outFreq, paramDict)
-        self.runAll()
-        self.runAnalysis()
+        #self.createEnsembles(m, n, k, s, method, tEnd, outFreq, paramDict)
         return
 
     def createDirectories(self):
@@ -599,13 +645,15 @@ class Population:
         return
 
     def runAll(self):
-        i = 1
-        for e in self.ensembles:
-            print('running ensemble %d' % i)
+        for i in range(self.p):
+            print('running ensemble %d' % (i + 1))
             if _logging:
                 self.logger.info('Running simulations on ' + e.name)
+            e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
+                         self.outFreq, self.paramDict, baseDir=self.dataDir,
+                         timestamp='e%d' % (i + 1))
             e.runAll()
-            i += 1
+            self.ensembles.append(e)
 
         self.runAnalysis()
         return
@@ -615,12 +663,19 @@ class Population:
         for e in self.ensembles:
             fn = e.name + '_ceRNA_equil_CCs.csv'
             da = np.genfromtxt(join(e.resultsDir, fn), delimiter=';', names=True)
-            rVals.extend(da['r'])
+
+            if self.n <= 2:
+                rVals.append(da['r'])
+            else:
+                rVals.extend(da['r'])
 
         fp = join(self.resultsDir, self.name + '_allCorrs')
         _histogram(fp, rVals, 'r')
 
-        print('# of r vals = %d' % len(rVals))
+        fn = join(self.resultsDir, self.name + '_allCorrs.csv')
+        _writeListToCSV(fn, rVals, 'r')
+
+        #print('# of r vals = %d' % len(rVals))
         return
 
 
@@ -645,14 +700,14 @@ if __name__ == '__main__':
     paramDict['dT'] = (2.5e-05, 2.5e-03)
     paramDict['dR'] = (1e-05, 1e-03)
     paramDict['b'] = (1e-04, 1e-02)
-    paramDict['u'] = (0, 1)
+    paramDict['u'] = (1e-04, 1e-02)
     paramDict['c'] = (7e-3, 7e-2)
     paramDict['a'] = (0.5, 0.5)
 
     maxHalfLife = 70000
     halfLifeMults = 2
     outFreq = 10
-    nSamples = 2
+    nSamples = 1
 
     if args.method == 'ssa':
         outFreq = 100
