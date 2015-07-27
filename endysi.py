@@ -84,7 +84,7 @@ def _histogram(filepath, x, xLabel, nBins=20, ddpi=120):
     histData = np.zeros(nBins, dtype=[('bin', 'f8'), ('count', 'f8')])
     np.copyto(histData['bin'], bins[:len(counts)])
     np.copyto(histData['count'], counts)
-    _writeDataToCSV(filepath + '_hist.csv', histData)
+    _writeDataToCSV(filepath + '_histData.csv', histData)
 
 
 def _plotAndSave(filename, x, y, xLabel, yLabel, ddpi=120):
@@ -110,12 +110,15 @@ def _writeListToCSV(filename, data, name):
 
 ### Class definitions ###
 class Experiment:
-    def __init__(self, method, model, tEnd, outFreq, pTarget='ceRNA', pProp=5.0):
+    def __init__(self, method, model, tEnd, outFreq, nSamples, pTarget='ceRNA', pProp=5.0):
 
         self.model = model
         self.simulator = bngl.BnglSimulator(model)
         self.perturbTarget = pTarget
         self.perturbProp = pProp
+        self.method = method
+        self.outFreq = outFreq
+        self.nSamples = nSamples
 
         self.action = 'simulate({method=>"%(meth)s",suffix=>"%(suf)s",' + \
                       'continue=>%(cnt)d,steady_state=>%(ss)d,' + \
@@ -209,6 +212,47 @@ class Experiment:
         #_writeDataToCSV(fn, self.perturbSS)
         return
 
+    def calcWithinConditionCorrelations(self):
+        # Pair up molecules for correlations
+        cePairs = list(combinations(self.ceRNAs, 2))
+
+        # Create tables for results
+        self.ceEquilWCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
+                                    ('r', 'f8'), ('p', 'f8')])
+
+        sampFreq = int(140000 / self.outFreq)
+        samplePoints = list(range(sampFreq, self.nSamples*sampFreq, sampFreq))
+
+        count = 0
+        for pair in cePairs:
+            mol1 = pair[0]
+            mol2 = pair[1]
+            mol1data = []
+            mol2data = []
+
+            # grab data at the sample frequency
+            for i in samplePoints:
+                mol1data.append(self.equilData[mol1][i])
+                mol2data.append(self.equilData[mol2][i])
+
+            (r, p) = pearsonr(mol1data, mol2data)
+
+            if math.isnan(r):
+                r = 0.0
+
+            pairString = '(%s, %s)' % (mol1, mol2)
+            self.ceEquilWCCs['mol pair'][count] = pairString
+            self.ceEquilWCCs['r'][count] = r
+            self.ceEquilWCCs['p'][count] = p
+
+            count += 1
+
+        # Write results to files
+        fn = self.model.filePath + '_ceRNA_equil_WCCs.csv'
+        _writeDataToCSV(fn, self.ceEquilWCCs, frmt=('%20s', '%.18e', '%.18e'))
+
+        return
+
     def plotTrajectories(self, ddpi=120):
         # Plot miRNAs
         fn = join(self.model.plotDir, self.model.name + '_miRNA_equil_traj')
@@ -263,6 +307,8 @@ class Experiment:
     def runAnalyses(self):
         self.loadData()
         self.calcSteadyStates()
+        if self.method == 'ssa':
+            self.calcWithinConditionCorrelations()
         #self.plotTrajectories()
         #self.makeFoldPlots()
         #self.deleteData()
@@ -275,7 +321,7 @@ class Experiment:
 
 
 class Ensemble:
-    def __init__(self, m, n, k, size, method, tEnd, outFreq, paramDict,
+    def __init__(self, m, n, k, size, method, tEnd, outFreq, nSamples, paramDict,
                  timestamp=None, baseDir=None):
 
         if timestamp is None:
@@ -293,6 +339,7 @@ class Ensemble:
         self.outFreq = outFreq
         self.models = []
         self.experiments = []
+        self.nSamples = nSamples
 
         self.createDirectories(baseDir)
 
@@ -408,6 +455,25 @@ class Ensemble:
 
         #fn = join(self.resultsDir, self.name + '_perturb_steadyStates.csv')
         #_writeDataToCSV(fn, self.perturbSS)
+        return
+
+    def calcWithinConditionCorrelations(self):
+        rVals = []
+        for e in self.experiments:
+            fn = e.model.filePath + '_ceRNA_equil_WCCs.csv'
+            da = np.genfromtxt(fn, delimiter=';', names=True)
+
+            if self.n <= 2:
+                rVals.append(da['r'])
+            else:
+                rVals.extend(da['r'])
+
+        fp = join(self.resultsDir, self.name + '_allWCCs')
+        _histogram(fp, rVals, 'r')
+
+        fn = join(self.resultsDir, self.name + '_allWCCs.csv')
+        _writeListToCSV(fn, rVals, 'r')
+
         return
 
     def calcCrossConditionCorrelations(self):
@@ -541,7 +607,10 @@ class Ensemble:
 
     def runAnalyses(self):
         self.collectSteadyStates()
-        self.calcCrossConditionCorrelations()
+        if self.method == 'ode':
+            self.calcCrossConditionCorrelations()
+        else:
+            self.calcWithinConditionCorrelations()
         return
 
     def runAll(self):
@@ -551,7 +620,9 @@ class Ensemble:
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      paramDict, seed=None)
 
-            e = Experiment(self.method, model, self.tEnd, self.outFreq)
+            e = Experiment(self.method, model, self.tEnd, self.outFreq,
+                           self.nSamples)
+
             e.run()
             e.runAnalyses()
             e.deleteData()
@@ -717,7 +788,7 @@ if __name__ == '__main__':
 
     if args.p == 1:
         eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
-                     outFreq, paramDict)
+                     outFreq, nSamples, paramDict)
         eds.runAll()
     else:
         p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
