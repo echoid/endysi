@@ -108,6 +108,23 @@ def _writeListToCSV(filename, data, name):
             f.write('%f;\n' % item)
 
 
+def _autocorrelate(X, maxDelta, outArray, freq=1, offset=0):
+    """Calculate correlations of an array of values with itself.
+
+    X is the input data array.
+    maxDelta is the maximum delta (i.e., t - delta).
+    outArray is the array in which to store resulting r values.
+    freq is an optional output frequency factor.
+    """
+
+    for d in range(1, maxDelta+1):
+        delta = d * freq
+        (r, p) = pearsonr(X[offset : -delta], X[delta+offset : ])
+        outArray[d-1] = r
+
+    return
+
+
 ### Class definitions ###
 class Experiment:
     def __init__(self, method, model, tEnd, outFreq, nSamples, pTarget='ceRNA', pProp=5.0):
@@ -487,12 +504,6 @@ class Ensemble:
         # Create tables for results
         self.ceEquilCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
                                                 ('r', 'f8'), ('p', 'f8')])
-        #self.cePerturbCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
-                                                #('r', 'f8'), ('p', 'f8')])
-        #self.miEquilCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
-                                                #('r', 'f8'), ('p', 'f8')])
-        #self.miPerturbCCs = np.zeros(len(miPairs), dtype=[('mol pair', 'a20'),
-                                                #('r', 'f8'), ('p', 'f8')])
 
         # Do the calculations
 
@@ -517,92 +528,10 @@ class Ensemble:
 
             count += 1
 
-        # Perturb steady states
-        #count = 0
-        #for pair in cePairs:
-            #mol1 = pair[0]
-            #mol2 = pair[1]
-            #mol1data = self.perturbSS[mol1]
-            #mol2data = self.perturbSS[mol2]
-
-            #(r, p) = pearsonr(mol1data, mol2data)
-
-            #if math.isnan(r):
-                #r = 0.0
-
-            #pairString = '(%s, %s)' % (mol1, mol2)
-            #self.cePerturbCCs['mol pair'][count] = pairString
-            #self.cePerturbCCs['r'][count] = r
-            #self.cePerturbCCs['p'][count] = p
-
-            #count += 1
-
-        # miRNAs
-        # Equil steady states
-        #count = 0
-        #for pair in miPairs:
-            #mol1 = pair[0]
-            #mol2 = pair[1]
-            #mol1data = self.equilSS[mol1]
-            #mol2data = self.equilSS[mol2]
-
-            #(r, p) = pearsonr(mol1data, mol2data)
-
-            #if math.isnan(r):
-                #r = 0.0
-
-            #pairString = '(%s, %s)' % (mol1, mol2)
-            #self.miEquilCCs['mol pair'][count] = pairString
-            #self.miEquilCCs['r'][count] = r
-            #self.miEquilCCs['p'][count] = p
-
-            #count += 1
-
-        # Perturb steady states
-        #count = 0
-        #for pair in miPairs:
-            #mol1 = pair[0]
-            #mol2 = pair[1]
-            #mol1data = self.perturbSS[mol1]
-            #mol2data = self.perturbSS[mol2]
-
-            #(r, p) = pearsonr(mol1data, mol2data)
-
-            #if math.isnan(r):
-                #r = 0.0
-
-            #pairString = '(%s, %s)' % (mol1, mol2)
-            #self.miPerturbCCs['mol pair'][count] = pairString
-            #self.miPerturbCCs['r'][count] = r
-            #self.miPerturbCCs['p'][count] = p
-
-            #count += 1
-
         # Write results to files
         fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCs.csv')
         _writeDataToCSV(fn, self.ceEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
 
-        #fn = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs.csv')
-        #_writeDataToCSV(fn, self.cePerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
-
-        #fn = join(self.resultsDir, self.name + '_miRNA_equil_CCs.csv')
-        #_writeDataToCSV(fn, self.miEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
-
-        #fn = join(self.resultsDir, self.name + '_miRNA_perturb_CCs.csv')
-        #_writeDataToCSV(fn, self.miPerturbCCs, frmt=('%20s', '%.18e', '%.18e'))
-
-        # Make histograms
-        #fp = join(self.resultsDir, self.name + '_ceRNA_equil_CCs_hist')
-        #_histogram(fp, self.ceEquilCCs['r'], 'r')
-
-        #fp = join(self.resultsDir, self.name + '_ceRNA_perturb_CCs_hist')
-        #_histogram(fp, self.cePerturbCCs['r'], 'r')
-
-        #fp = join(self.resultsDir, self.name + '_miRNA_equil_CCs_hist')
-        #_histogram(fp, self.miEquilCCs['r'], 'r')
-
-        #fp = join(self.resultsDir, self.name + '_miRNA_perturb_CCs_hist')
-        #_histogram(fp, self.miPerturbCCs['r'], 'r')
         return
 
     def runAnalyses(self):
@@ -618,7 +547,7 @@ class Ensemble:
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, seed=None)
+                                     paramDict, seed=i)
 
             e = Experiment(self.method, model, self.tEnd, self.outFreq,
                            self.nSamples)
