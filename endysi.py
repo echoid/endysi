@@ -270,6 +270,33 @@ class Experiment:
 
         return
 
+    def calcAutocorrelations(self):
+        maxHalfLife = 70000
+        halfLifeMults = 2
+        simTime = maxHalfLife * halfLifeMults * nSamples
+        sampFreq = int((simTime / self.outFreq) / self.nSamples)
+        maxDelta = 50
+        startPoint = sampFreq
+
+        # create array for r values
+        dt = [(mol.split('_')[0], 'f8') for mol in self.ceRNAs]
+        dt.insert(0, ('delta', 'i4'))
+        rVals = np.zeros(maxDelta, dtype=dt)
+        rVals['delta'] = np.arange(1, maxDelta+1)
+
+        # calculate autocorrs
+        for mol in self.ceRNAs:
+            molName = mol.split('_')[0]
+            _autocorrelate(self.equilData[mol], maxDelta, rVals[molName],
+                           freq=sampFreq, offset=startPoint)
+
+        # write ACs to file
+        head = 'delta'
+        for mol in self.ceRNAs:
+            head += ';%s' % mol.split('_')[0]
+        fn = self.model.filePath + '_autocorrelations.csv'
+        np.savetxt(fn, rVals, delimiter=';', header=head, comments='')
+
     def plotTrajectories(self, ddpi=120):
         # Plot miRNAs
         fn = join(self.model.plotDir, self.model.name + '_miRNA_equil_traj')
@@ -326,6 +353,7 @@ class Experiment:
         self.calcSteadyStates()
         if self.method == 'ssa':
             self.calcWithinConditionCorrelations()
+            self.calcAutocorrelations()
         #self.plotTrajectories()
         #self.makeFoldPlots()
         #self.deleteData()
@@ -493,6 +521,43 @@ class Ensemble:
 
         return
 
+    def calcAutocorrelations(self):
+        maxDelta = 50
+        allRvals = []
+        for e in self.experiments:
+            fn = e.model.filePath + '_autocorrelations.csv'
+            da = np.genfromtxt(fn, delimiter=';', names=True)
+            allRvals.append(da)
+
+        avgRvals = np.zeros(maxDelta, dtype=allRvals[0].dtype)
+        avgRvals['delta'] = np.arange(1, maxDelta+1)
+
+        mols = [name for name in avgRvals.dtype.names if name != 'delta']
+        for mol in mols:
+            molData = [rVals[mol] for rVals in allRvals]
+            for i in range(maxDelta):
+                rAvg = sum([rVals[i] for rVals in molData]) / len(molData)
+                avgRvals[mol][i] = rAvg
+
+        # write avgs to file
+        head = 'delta'
+        for mol in mols:
+            head += ';%s' % mol.split('_')[0]
+        fn = join(self.resultsDir, '%s_avgACs.csv' % self.name)
+        np.savetxt(fn, avgRvals, delimiter=';', header=head, comments='')
+
+        # plot ACs
+        fig = plt.figure()
+        for mol in mols:
+            plt.plot(avgRvals['delta'], avgRvals[mol], label=mol)
+        plt.xlabel('delta')
+        plt.ylabel('r')
+        plt.legend()
+        fn = join(self.resultsDir, '%s_avgACs.png' % self.name)
+        plt.savefig(fn, dpi=120, bbox_inches='tight')
+        plt.close(fig)
+
+
     def calcCrossConditionCorrelations(self):
         # Pair up molecules for correlations
         names = self.experiments[0].equilSS.dtype.names
@@ -540,6 +605,7 @@ class Ensemble:
             self.calcCrossConditionCorrelations()
         else:
             self.calcWithinConditionCorrelations()
+            self.calcAutocorrelations()
         return
 
     def runAll(self):
