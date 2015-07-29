@@ -613,7 +613,7 @@ class Ensemble:
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, seed=i)
+                                     paramDict)
 
             e = Experiment(self.method, model, self.tEnd, self.outFreq,
                            self.nSamples)
