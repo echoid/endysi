@@ -399,7 +399,16 @@ class Ensemble:
 
         #self.createModels(paramDict)
         #self.createExperiments(method, tEnd, outFreq)
+        self.writeRunInfo()
         return
+
+    def writeRunInfo(self):
+        with open(join(self.curRun, 'runInfo'), 'w') as riFile:
+            riFile.write('Ensemble of %d parameter sets\n' % self.size)
+            riFile.write('m = %d\n' % self.m)
+            riFile.write('n = %d\n' % self.n)
+            riFile.write('k = %d\n' % self.k)
+            riFile.write('method: %s\n' % self.method)
 
     def createLoggers(self):
         # create loggers and set levels
@@ -440,19 +449,6 @@ class Ensemble:
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
         return
-
-    def doit(self):
-        for i in range(1, self.size + 1):
-            dDir = join(self.dataDir, 'model%d' % i)
-            model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, seed=None)
-
-            e = Experiment(self.method, model, self.tEnd, self.outFreq)
-            e.run()
-            e.runAnalyses()
-            e.deleteData()
-            e.purge()
-            self.experiments.append(e)
 
     def createModels(self, paramDict):
         for i in range(1, self.size + 1):
@@ -557,7 +553,6 @@ class Ensemble:
         plt.savefig(fn, dpi=120, bbox_inches='tight')
         plt.close(fig)
 
-
     def calcCrossConditionCorrelations(self):
         # Pair up molecules for correlations
         names = self.experiments[0].equilSS.dtype.names
@@ -596,6 +591,8 @@ class Ensemble:
         # Write results to files
         fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCs.csv')
         _writeDataToCSV(fn, self.ceEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
+        fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCCs')
+        _histogram(fn, self.ceEquilCCs['r'], 'r')
 
         return
 
@@ -613,7 +610,7 @@ class Ensemble:
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict)
+                                     paramDict, seed=i)
 
             e = Experiment(self.method, model, self.tEnd, self.outFreq,
                            self.nSamples)
@@ -661,7 +658,17 @@ class Population:
             self.logger.info(msg)
 
         #self.createEnsembles(m, n, k, s, method, tEnd, outFreq, paramDict)
+        self.writeRunInfo()
         return
+
+    def writeRunInfo(self):
+        with open(join(self.curRun, 'runInfo'), 'w') as riFile:
+            riFile.write('Population of %d ensembles, each of size %d\n' %
+                         (self.p, self.s))
+            riFile.write('m = %d\n' % self.m)
+            riFile.write('n = %d\n' % self.n)
+            riFile.write('k = %d\n' % self.k)
+            riFile.write('method: %s\n' % self.method)
 
     def createDirectories(self):
         self.rootDir = join(os.path.expanduser('~'),
@@ -711,17 +718,22 @@ class Population:
         return
 
     def runAll(self):
+        tStart = time.time()
         for i in range(self.p):
-            print('running ensemble %d' % (i + 1))
+            #print('running ensemble %d' % (i + 1))
             if _logging:
                 self.logger.info('Running simulations on ' + e.name)
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
-                         self.outFreq, self.paramDict, baseDir=self.dataDir,
+                         self.outFreq, 1, self.paramDict, baseDir=self.dataDir,
                          timestamp='e%d' % (i + 1))
             e.runAll()
             self.ensembles.append(e)
 
         self.runAnalysis()
+
+        tEnd = time.time()
+        tElapsed = tEnd - tStart
+        print('Time elapsed: %f' % tElapsed)
         return
 
     def runAnalysis(self):

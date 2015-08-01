@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 import pexpect
 from utilities import *
 
+# Global params:
+_nFlips = 1000
+
+# Debugging
+_debugging = False
 
 class CernetModel:
     def __init__(self, home, m, n, k, index, paramDict, seed=None,
@@ -44,7 +49,6 @@ class CernetModel:
         self.createRulesAndParams(paramDict)
 
         self.writeNetworkFiles()
-        #self.writeBNGL()
 
     def purge(self):
         del self.ceRNAs
@@ -58,8 +62,8 @@ class CernetModel:
 
     def writeNetworkFiles(self):
         self.writeBNGL()
-        #self.writeSIF()
-        #self.writeGML()
+        self.writeSIF()
+        self.writeGML()
         self.writeParamFile()
         #self.saveNetworkImage()
 
@@ -84,13 +88,63 @@ class CernetModel:
         self.molTypes = list(self.ceRNAs)
         self.molTypes.extend(self.miRNAs)
 
-    def createComplexes(self):
+    def createComplexes_orig(self):
         for ceRNA in self.ceRNAs:
-            regs = random.sample(self.miRNAs, self.k)
-            ceRNA.regs.extend(regs)
-            for reg in regs:
-                reg.targs.append(ceRNA)
+            partners = random.sample(self.miRNAs, self.k)
+            ceRNA.partners.extend(partners)
+            for reg in partners:
+                reg.partners.append(ceRNA)
                 self.complexes.append(BnglComplex(ceRNA, reg))
+
+    def createComplexes(self):
+        if self.m <= 1 or self.n == self.k == self.m:
+            self.createComplexes_orig()
+
+        else:
+            for ceRNA in self.ceRNAs:
+                # get the indices for the miRNAs
+                indices = []
+                for i in range(self.k):
+                    d = ceRNA.num + i
+                    if d > self.m:
+                        d = d - self.m
+                    indices.append(d)
+
+                # create the connections
+                for i in indices:
+                    miRNA = self.getMolWithName('miRNA%d' % i)
+                    self.complexes.append(BnglComplex(ceRNA, miRNA))
+                    ceRNA.partners.append(miRNA)
+                    miRNA.partners.append(ceRNA)
+
+            self.shuffleNodes()
+
+    def shuffleNodes(self):
+        for i in range(_nFlips):
+            comps = random.sample(self.complexes, 2)
+
+            while not self.swapNodes(comps[0], comps[1]):
+                comps = random.sample(self.complexes, 2)
+
+    def swapNodes(self, compA, compB):
+        ax = compA.molX
+        ay = compA.molY
+        bx = compB.molX
+        by = compB.molY
+
+        if ax.hasPartner(by) or bx.hasPartner(ay):
+            return False
+
+        ax.replacePartner(ay, by)
+        ay.replacePartner(ax, bx)
+        bx.replacePartner(by, ay)
+        by.replacePartner(bx, ax)
+
+        compA.molX = bx
+        compB.molX = ax
+        compA.rewriteCode()
+        compB.rewriteCode()
+        return True
 
     def createObservables(self):
         for mol in self.ceRNAs:
@@ -153,7 +207,6 @@ class CernetModel:
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
 
-        # Binding rules
         for comp in self.complexes:
             molX = comp.molX
             molY = comp.molY
@@ -297,27 +350,46 @@ class CernetModel:
         plt.close()
 
 
-class CeRNA:
+class RNA:
+    def __init__(self):
+        self.partners = []
+
+    def hasDuplicates(self, r):
+        return r in self.partners
+
+    def hasPartner(self, p):
+        return p in self.partners
+
+    def replacePartner(self, oldP, newP):
+        if oldP not in self.partners:
+            return
+
+        self.partners.remove(oldP)
+        self.partners.append(newP)
+
+class CeRNA(RNA):
     def __init__(self, num, id_):
         self.id = id_
         self.num = num
         self.name = 'ceRNA%d' % num
         self.comps = 'm'
         self.bnglCode = '%s(%s)' % (self.name, self.comps)
-        self.regs = []
+        self.partners = []
         self.prodRate = 0.0
         self.decayRate = 0.0
 
-class MiRNA:
+
+class MiRNA(RNA):
     def __init__(self, num, id_):
         self.id = id_
         self.num = num
         self.name = 'miRNA%d' % num
         self.comps = 'c'
         self.bnglCode = '%s(%s)' % (self.name, self.comps)
-        self.targs = []
+        self.partners = []
         self.prodRate = 0.0
         self.decayRate = 0.0
+
 
 class BnglComplex:
     def __init__(self, x, y):
@@ -327,6 +399,11 @@ class BnglComplex:
         self.bnglCode = ts.format(x.name, x.comps, y.name, y.comps)
         self.kon = 0.0
         self.koff = 0.0
+
+    def rewriteCode(self):
+        ts = '{0}({1}!1).{2}({3}!1)'
+        self.bnglCode = ts.format(self.molX.name, self.molX.comps,
+                                  self.molY.name, self.molY.comps)
 
 
 class BnglRule:
