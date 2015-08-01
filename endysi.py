@@ -181,7 +181,8 @@ class Experiment:
         #newProdRate = oldProdRate * self.perturbProp
         #self.simulator.setParameter(param, newProdRate)
         #self.simulator.sendAction(self.action % self.opts)
-        self.simulator.close()
+        self.simulator.done()
+        #self.simulator.close()
 
         return
 
