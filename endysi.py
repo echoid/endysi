@@ -1,4 +1,7 @@
 #!/usr/bin/env python2
+###############################################################################
+# Endysi: ensemble dynamics simulator for ceRNA networks
+###############################################################################
 
 from __future__ import print_function, division
 import os
@@ -22,6 +25,40 @@ _logging = False
 # Global dpi for plots
 _dpi = 120
 
+# Global setting for random seeding
+_seeding = True
+
+#paramDict = {}
+#paramDict['vol'] = 2.0e-12
+#paramDict['pR'] = (2.4e-03, 2.4e-01)
+#paramDict['pS'] = (2.4e-03, 2.4e-01)
+#paramDict['dR'] = (1e-05, 1e-03)
+#paramDict['dS'] = (2.5e-05, 2.5e-03)
+#paramDict['b'] = (1e-04, 1e-02)
+#paramDict['u'] = (1e-04, 1e-02)
+#paramDict['c'] = (7e-03, 7e-02)
+#paramDict['a'] = (0.5, 0.5)
+
+#maxHalfLife = 700000000
+#halfLifeMults = 2
+#outFreq = 10000
+#nSamples = 1
+
+# colours
+purple = '#673594'
+magenta = '#a0228d'
+pink = '#ed1991'
+red = '#ee393b'
+yellow = '#f4ee37'
+green = '#4bbc44'
+blue = '#30c6f5'
+navy = '#33689c'
+aqua = '#30f5bb'
+orange = '#f58d30'
+
+colours10 = [purple, magenta, pink, red, yellow, green, blue,
+           navy, aqua, orange]
+
 
 # Global functions (mostly for analysis and plotting)
 def _plotAllTrajectories(filename, data, mols, colours=None, ddpi=120):
@@ -34,20 +71,7 @@ def _plotAllTrajectories(filename, data, mols, colours=None, ddpi=120):
         return
 
     if colours is None:
-        # colours
-        purple = '#673594'
-        magenta = '#a0228d'
-        pink = '#ed1991'
-        red = '#ee393b'
-        yellow = '#f4ee37'
-        green = '#4bbc44'
-        blue = '#30c6f5'
-        navy = '#33689c'
-        aqua = '#30f5bb'
-        orange = '#f58d30'
-
-        colours = [purple, magenta, pink, red, yellow, green, blue,
-                   navy, aqua, orange]
+        colours = colours10
 
     count = 0
     fig = plt.figure()
@@ -59,7 +83,7 @@ def _plotAllTrajectories(filename, data, mols, colours=None, ddpi=120):
     plt.xlabel('Time (s)')
     plt.ylabel('Free molecules')
     plt.legend()
-    plt.savefig(filename, dpi=ddpi, bbox_inches='tight')
+    plt.savefig(filename, dpi=_dpi, bbox_inches='tight')
     plt.close(fig)
 
 
@@ -77,7 +101,7 @@ def _histogram(filepath, x, xLabel, nBins=20, ddpi=120):
     (counts, bins, patches) = plt.hist(x, bins=nBins)
     plt.xlabel(xLabel)
     plt.ylabel('frequency')
-    plt.savefig(filepath + '.png', dpi=ddpi, bbox_inches='tight')
+    plt.savefig(filepath + '.png', dpi=_dpi, bbox_inches='tight')
     plt.close(fig)
 
     # Save the data
@@ -87,8 +111,20 @@ def _histogram(filepath, x, xLabel, nBins=20, ddpi=120):
     _writeDataToCSV(filepath + '_histData.csv', histData)
 
 
-def _plotAndSave(filename, x, y, xLabel, yLabel, ddpi=120):
-    pass
+def _scatterPlot(filename, x, y, coloured, xLabel, yLabel, size=30, title=None):
+    if coloured:
+        colour = colours10
+    else:
+        colour = 'b'
+
+    fig = plt.figure()
+    plt.scatter(x, y, s=size, c=colour, linewidth=0.1)
+    if title is not None:
+        fig.suptitle(title)
+    plt.xlabel(xLabel)
+    plt.ylabel(yLabel)
+    plt.savefig(filename, dpi=_dpi, bbox_inches='tight')
+    plt.close(fig)
 
 
 def _writeDataToCSV(filename, data, delim=';', comment='', frmt='%.18e'):
@@ -117,17 +153,18 @@ def _autocorrelate(X, maxDelta, outArray, freq=1, offset=0):
     freq is an optional output frequency factor.
     """
 
-    for d in range(1, maxDelta+1):
+    for d in range(1, maxDelta + 1):
         delta = d * freq
-        (r, p) = pearsonr(X[offset : -delta], X[delta+offset : ])
-        outArray[d-1] = r
+        (r, p) = pearsonr(X[offset:-delta], X[delta + offset:])
+        outArray[d - 1] = r
 
     return
 
 
 ### Class definitions ###
 class Experiment:
-    def __init__(self, method, model, tEnd, outFreq, nSamples, pTarget='ceRNA', pProp=5.0):
+    def __init__(self, parent, method, model, tEnd, outFreq, nSamples,
+                 pTarget='ceRNA', pProp=5.0):
 
         self.model = model
         self.simulator = bngl.BnglSimulator(model)
@@ -136,6 +173,7 @@ class Experiment:
         self.method = method
         self.outFreq = outFreq
         self.nSamples = nSamples
+        self.parent = parent
 
         self.action = 'simulate({method=>"%(meth)s",suffix=>"%(suf)s",' + \
                       'continue=>%(cnt)d,steady_state=>%(ss)d,' + \
@@ -145,6 +183,12 @@ class Experiment:
         nsteps = int(tEnd / outFreq)
         self.opts = {'suf': 'sim', 'tend': tEnd, 'nsteps': nsteps, 'cnt': 0,
                      'meth': method, 'pcdat': 0, 'ss': 0}
+
+        if method == 'ode':
+            self.opts['ss'] = 1
+            tend = 100000000000
+            self.opts['tend'] = tend
+            self.opts['nsteps'] = int(tend / outFreq)
         return
 
     def purge(self):
@@ -165,24 +209,7 @@ class Experiment:
         self.simulator.sendAction(self.action % self.opts)
         self.simulator.saveConcentrations()
 
-        # Perturbation phase
-        #self.opts['suf'] = 'perturb'
-        #pMol = None
-        #param = None
-
-        #if self.perturbTarget == 'miRNA':
-            #pMol = self.model.getMolWithName('miRNA1')
-            #param = 'pR_1'
-        #else:
-            #pMol = self.model.getMolWithName('ceRNA1')
-            #param = 'pT_1'
-
-        #oldProdRate = pMol.prodRate
-        #newProdRate = oldProdRate * self.perturbProp
-        #self.simulator.setParameter(param, newProdRate)
-        #self.simulator.sendAction(self.action % self.opts)
         self.simulator.done()
-        #self.simulator.close()
 
         return
 
@@ -226,8 +253,6 @@ class Experiment:
         fn = self.model.filePath + '_equil_steadyStates.csv'
         _writeDataToCSV(fn, self.equilSS)
 
-        #fn = self.model.filePath + '_perturb_steadyStates.csv'
-        #_writeDataToCSV(fn, self.perturbSS)
         return
 
     def calcWithinConditionCorrelations(self):
@@ -239,9 +264,14 @@ class Experiment:
                                     ('r', 'f8'), ('p', 'f8')])
 
         sampFreq = int(140000 / self.outFreq)
-        samplePoints = list(range(sampFreq, self.nSamples*sampFreq, sampFreq))
+        samplePoints = list(range(sampFreq, self.nSamples * sampFreq, sampFreq))
+
+        # Create a directory for NaN correlation data
+        self.nanDir = join(self.parent.resultsDir, 'nanData')
+        makeDirs(self.nanDir)
 
         count = 0
+        nans = 0
         for pair in cePairs:
             mol1 = pair[0]
             mol2 = pair[1]
@@ -256,7 +286,15 @@ class Experiment:
             (r, p) = pearsonr(mol1data, mol2data)
 
             if math.isnan(r):
+                nans += 1
                 r = 0.0
+                nanData = np.zeros(self.nSamples - 1, dtype=[(mol1, 'f8'),
+                                                         (mol2, 'f8')])
+                nanData[mol1] = mol1data
+                nanData[mol2] = mol2data
+                fn = join(self.nanDir, '%s_%s_%s.csv' % (self.model.name, mol1,
+                                                         mol2))
+                _writeDataToCSV(fn, nanData, frmt=('%.18e', '%.18e'))
 
             pairString = '(%s, %s)' % (mol1, mol2)
             self.ceEquilWCCs['mol pair'][count] = pairString
@@ -283,7 +321,7 @@ class Experiment:
         dt = [(mol.split('_')[0], 'f8') for mol in self.ceRNAs]
         dt.insert(0, ('delta', 'i4'))
         rVals = np.zeros(maxDelta, dtype=dt)
-        rVals['delta'] = np.arange(1, maxDelta+1)
+        rVals['delta'] = np.arange(1, maxDelta + 1)
 
         # calculate autocorrs
         for mol in self.ceRNAs:
@@ -297,6 +335,7 @@ class Experiment:
             head += ';%s' % mol.split('_')[0]
         fn = self.model.filePath + '_autocorrelations.csv'
         np.savetxt(fn, rVals, delimiter=';', header=head, comments='')
+        return
 
     def plotTrajectories(self, ddpi=120):
         # Plot miRNAs
@@ -309,9 +348,90 @@ class Experiment:
         # Plot ceRNAs
         fn = join(self.model.plotDir, self.model.name + '_ceRNA_equil_traj')
         _plotAllTrajectories(fn, self.equilData, self.ceRNAs)
+        return
 
-        #fn = join(self.model.plotDir, self.model.name + '_ceRNA_perturb_traj')
-        #_plotAllTrajectories(fn, self.perturbData, self.ceRNAs)
+    def writeBindingPartners(self):
+        fn = join(self.model.home, 'bindingPartners.txt')
+        with open(fn, 'w') as f:
+            f.write('Binding Partners:\n')
+            f.write('ceRNAs:\n')
+            for ceRNA in self.model.ceRNAs:
+                p = [mol.name for mol in ceRNA.partners]
+                f.write(ceRNA.name + ': ' + str(p) + '\n')
+
+            f.write('\nmiRNAs:\n')
+            for miRNA in self.model.miRNAs:
+                p = [mol.name for mol in miRNA.partners]
+                f.write(miRNA.name + ': ' + str(p) + '\n')
+
+        return
+
+    def makeScatterPlots(self):
+        # gather params
+        dt = [('steady state', 'f8'), ('trans', 'f8'), ('decay', 'f8'),
+              ('halflife', 'f8')]
+        ceParams = np.zeros(self.model.n, dtype=dt)
+        miParams = np.zeros(self.model.m, dtype=dt)
+
+        for ceRNA in self.model.ceRNAs:
+            ceParams['trans'][ceRNA.num - 1] = ceRNA.prodRate
+            ceParams['decay'][ceRNA.num - 1] = ceRNA.decayRate
+            ceParams['halflife'][ceRNA.num - 1] = math.log(2) / ceRNA.decayRate
+            ceParams['steady state'][ceRNA.num - 1] = \
+                    self.equilSS[0][ceRNA.id - 1]
+
+        for miRNA in self.model.miRNAs:
+            miParams['trans'][miRNA.num - 1] = miRNA.prodRate
+            miParams['decay'][miRNA.num - 1] = miRNA.decayRate
+            miParams['halflife'][miRNA.num - 1] = math.log(2) / miRNA.decayRate
+            miParams['steady state'][miRNA.num - 1] = \
+                    self.equilSS[0][miRNA.id - 1]
+
+        # save the data
+        fn = self.model.filePath + '_ceRNA_ss_and_params.csv'
+        _writeDataToCSV(fn, ceParams)
+
+        fn = self.model.filePath + '_miRNA_ss_and_params.csv'
+        _writeDataToCSV(fn, miParams)
+
+        # make the plots
+        # trans vs ceSS
+        fn = join(self.model.plotDir, self.model.name + '_trans_vs_ceSS.png')
+        t = 'ceRNAs: transcription rates vs steady states'
+        _scatterPlot(fn, ceParams['trans'], ceParams['steady state'], True,
+                     'transcription rate', 'ceRNA', title=t)
+
+        # decay vs ceSS
+        fn = join(self.model.plotDir, self.model.name + '_decay_vs_ceSS.png')
+        t = 'ceRNAs: decay rates vs steady states'
+        _scatterPlot(fn, ceParams['trans'], ceParams['steady state'], True,
+                     'decay rate', 'ceRNA', title=t)
+
+        # half-life vs ceSS
+        fn = join(self.model.plotDir, self.model.name + '_halflife_vs_ceSS.png')
+        t = 'ceRNAs: half-life vs steady states'
+        _scatterPlot(fn, ceParams['halflife'], ceParams['steady state'], True,
+                     'half-life', 'ceRNA', title=t)
+
+        # miRNAs
+        # trans vs miSS
+        fn = join(self.model.plotDir, self.model.name + '_trans_vs_miSS.png')
+        t = 'miRNAs: transcription rates vs steady states'
+        _scatterPlot(fn, miParams['trans'], miParams['steady state'], True,
+                     'transcription rate', 'miRNA', title=t)
+
+        # decay vs miSS
+        fn = join(self.model.plotDir, self.model.name + '_decay_vs_miSS.png')
+        t = 'miRNAs: decay rates vs steady states'
+        _scatterPlot(fn, miParams['trans'], miParams['steady state'], True,
+                     'decay rate', 'miRNA', title=t)
+
+        # half-life vs miSS
+        fn = join(self.model.plotDir, self.model.name + '_halflife_vs_miSS.png')
+        t = 'miRNAs: half-life vs steady states'
+        _scatterPlot(fn, miParams['halflife'], miParams['steady state'], True,
+                     'half-life', 'miRNA', title=t)
+
         return
 
     def makeFoldPlots(self, ddpi=120):
@@ -336,17 +456,6 @@ class Experiment:
         fn = join(self.model.plotDir, self.model.name + '_equil_foldPlots.png')
         plt.savefig(fn, dpi=ddpi, bbox_inches='tight')
         plt.close(fig)
-
-        # Perturb data
-        #i = 0
-        #fig = plt.figure()
-        #for pair in self.corrMols['ceRNA']:
-            #plt.plot(self.perturbData[pair[0]], self.perturbData[pair[1]],
-                     #colours[i])
-            #i += 1
-        #fn = join(self.model.plotDir, self.model.name + '_perturb_foldPlots.png')
-        #plt.savefig(fn, dpi=ddpi, bbox_inches='tight')
-        #plt.close(fig)
         return
 
     def runAnalyses(self):
@@ -355,20 +464,21 @@ class Experiment:
         if self.method == 'ssa':
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
-        #self.plotTrajectories()
+        self.plotTrajectories()
+        self.makeScatterPlots()
+        self.writeBindingPartners()
         #self.makeFoldPlots()
         #self.deleteData()
         return
 
     def deleteData(self):
         del self.equilData
-        #del self.perturbData
         return
 
 
 class Ensemble:
-    def __init__(self, m, n, k, size, method, tEnd, outFreq, nSamples, paramDict,
-                 timestamp=None, baseDir=None):
+    def __init__(self, m, n, k, size, method, tEnd, outFreq, nSamples,
+                 paramDict, timestamp=None, baseDir=None, linearSampling=1):
 
         if timestamp is None:
             self.timestamp = genTimeString()
@@ -386,20 +496,20 @@ class Ensemble:
         self.models = []
         self.experiments = []
         self.nSamples = nSamples
+        self.linearSampling = bool(linearSampling)
 
         self.createDirectories(baseDir)
 
         if _logging:
             self.createLoggers()
-            msg = 'Initializing system to run {0} networks with M={1}, N={2}, K={3}'
+            msg = 'Initializing system to run {0} networks with M={1}, ' + \
+                   'N={2}, K={3}'
             self.logger.info(msg.format(size, m, n, k))
             self.logger.info('Parameter ranges are as follows:')
             self.logger.info(str(paramDict))
 
             self.logger.info('Creating models...')
 
-        #self.createModels(paramDict)
-        #self.createExperiments(method, tEnd, outFreq)
         self.writeRunInfo()
         return
 
@@ -410,6 +520,8 @@ class Ensemble:
             riFile.write('n = %d\n' % self.n)
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
+
+        return
 
     def createLoggers(self):
         # create loggers and set levels
@@ -468,7 +580,8 @@ class Ensemble:
     def runExperiments(self):
         for experiment in self.experiments:
             if _logging:
-                self.logger.info('Running simulations on %s' % experiment.model.name)
+                m = 'Running simulations on %s' % experiment.model.name
+                self.logger.info(m)
 
             experiment.run()
             experiment.runAnalyses()
@@ -481,7 +594,6 @@ class Ensemble:
         ssdt = [(name, 'f8') for name in names]
         ssdt.insert(0, ('model', 'i4'))
         self.equilSS = np.zeros(self.size, dtype=ssdt)
-        #self.perturbSS = np.zeros(self.size, dtype=ssdt)
 
         for experiment in self.experiments:
             i = experiment.model.index
@@ -489,14 +601,11 @@ class Ensemble:
             #self.perturbSS['model'][i - 1] = i
             for name in names:
                 self.equilSS[name][i - 1] = experiment.equilSS[name][0]
-                #self.perturbSS[name][i - 1] = experiment.perturbSS[name][0]
 
         # Write to file
         fn = join(self.resultsDir, self.name + '_equil_steadyStates.csv')
         _writeDataToCSV(fn, self.equilSS)
 
-        #fn = join(self.resultsDir, self.name + '_perturb_steadyStates.csv')
-        #_writeDataToCSV(fn, self.perturbSS)
         return
 
     def calcWithinConditionCorrelations(self):
@@ -527,7 +636,7 @@ class Ensemble:
             allRvals.append(da)
 
         avgRvals = np.zeros(maxDelta, dtype=allRvals[0].dtype)
-        avgRvals['delta'] = np.arange(1, maxDelta+1)
+        avgRvals['delta'] = np.arange(1, maxDelta + 1)
 
         mols = [name for name in avgRvals.dtype.names if name != 'delta']
         for mol in mols:
@@ -554,6 +663,8 @@ class Ensemble:
         plt.savefig(fn, dpi=120, bbox_inches='tight')
         plt.close(fig)
 
+        return
+
     def calcCrossConditionCorrelations(self):
         # Pair up molecules for correlations
         names = self.experiments[0].equilSS.dtype.names
@@ -567,7 +678,6 @@ class Ensemble:
                                                 ('r', 'f8'), ('p', 'f8')])
 
         # Do the calculations
-
         # ceRNAs
         # Equil steady states
         count = 0
@@ -610,10 +720,16 @@ class Ensemble:
         tStart = time.time()
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
-            model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, seed=i)
+            if _seeding:
+                s = i
+            else:
+                s = None
 
-            e = Experiment(self.method, model, self.tEnd, self.outFreq,
+            model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
+                                     paramDict, seed=s,
+                                     linearSampling=self.linearSampling)
+
+            e = Experiment(self, self.method, model, self.tEnd, self.outFreq,
                            self.nSamples)
 
             e.run()
@@ -627,13 +743,13 @@ class Ensemble:
         tElapsed = tEnd - tStart
         if _logging:
             self.logger.info('Time elapsed %.3f' % tElapsed)
-        #print('Time elapsed %.3f' % tElapsed)
+
         return
 
 
 class Population:
     def __init__(self, p, m, n, k, s, method, tEnd, outFreq, paramDict,
-                 timestamp=None):
+                 timestamp=None, baseDir=None, linearSampling=1):
 
         if timestamp is None:
             self.timestamp = genTimeString()
@@ -651,15 +767,23 @@ class Population:
         self.paramDict = paramDict
         self.name = 'Pop@%d_%dx%dc%dx%d' % (p, m, n, k, s)
         self.ensembles = []
+
+        if baseDir is None:
+            self.rootDir = join(os.path.expanduser('~'),
+                            'research/results/ceRNA/endysi/' + self.name)
+        else:
+            self.rootDir = join(baseDir, 'ceRNA/endysi' + self.name)
+
         self.createDirectories()
+        self.linearSampling = bool(linearSampling)
 
         if _logging:
             self.createLoggers()
-            msg = 'Initializing population of size %d, with %d %dx%dx%d ensembles ' % (p, s, m, n, k)
+            msg = 'Initializing population of size %d, with %d ' + \
+                   '%dx%dx%d ensembles ' % (p, s, m, n, k)
             self.logger.info(msg)
-
-        #self.createEnsembles(m, n, k, s, method, tEnd, outFreq, paramDict)
         self.writeRunInfo()
+
         return
 
     def writeRunInfo(self):
@@ -670,6 +794,7 @@ class Population:
             riFile.write('n = %d\n' % self.n)
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
+        return
 
     def createDirectories(self):
         self.rootDir = join(os.path.expanduser('~'),
@@ -721,12 +846,12 @@ class Population:
     def runAll(self):
         tStart = time.time()
         for i in range(self.p):
-            #print('running ensemble %d' % (i + 1))
             if _logging:
                 self.logger.info('Running simulations on ' + e.name)
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
                          self.outFreq, 1, self.paramDict, baseDir=self.dataDir,
-                         timestamp='e%d' % (i + 1))
+                         timestamp='e%d' % (i + 1),
+                         linearSampling=self.linearSampling)
             e.runAll()
             self.ensembles.append(e)
 
@@ -741,7 +866,8 @@ class Population:
         rVals = []
         for e in self.ensembles:
             fn = e.name + '_ceRNA_equil_CCs.csv'
-            da = np.genfromtxt(join(e.resultsDir, fn), delimiter=';', names=True)
+            da = np.genfromtxt(join(e.resultsDir, fn), delimiter=';',
+                               names=True)
 
             if self.n <= 2:
                 rVals.append(da['r'])
@@ -754,12 +880,12 @@ class Population:
         fn = join(self.resultsDir, self.name + '_allCorrs.csv')
         _writeListToCSV(fn, rVals, 'r')
 
-        #print('# of r vals = %d' % len(rVals))
         return
 
 
 if __name__ == '__main__':
     import argparse
+    import socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', type=int, default=1,
                         help='The size of the population of ensembles')
@@ -770,35 +896,45 @@ if __name__ == '__main__':
                         help='The number of models in each ensemble')
     parser.add_argument('--method', type=str,
                         help='Simulation method: ode or ssa')
+    parser.add_argument('--linear', type=int, default=0,
+                        help='Whether to sample over linear or log space')
+
     args = parser.parse_args()
 
     paramDict = {}
     paramDict['vol'] = 2.0e-12
-    paramDict['pT'] = (2.4e-3, 2.4e-1)
-    paramDict['pR'] = (2.4e-3, 2.4e-1)
-    paramDict['dT'] = (2.5e-05, 2.5e-03)
+    paramDict['pR'] = (2.4e-03, 2.4e-01)
+    paramDict['pS'] = (2.4e-03, 2.4e-01)
     paramDict['dR'] = (1e-05, 1e-03)
+    paramDict['dS'] = (2.5e-05, 2.5e-03)
     paramDict['b'] = (1e-04, 1e-02)
     paramDict['u'] = (1e-04, 1e-02)
-    paramDict['c'] = (7e-3, 7e-2)
+    paramDict['c'] = (7e-03, 7e-02)
     paramDict['a'] = (0.5, 0.5)
 
-    maxHalfLife = 70000
+    maxHalfLife = 700000000
     halfLifeMults = 2
-    outFreq = 10
+    outFreq = 10000
     nSamples = 1
 
     if args.method == 'ssa':
         outFreq = 100
-        nSamples = 300
+        nSamples = 100
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
+    baseDir = None
+    hostname = socket.gethostname()
+    if hostname == 'crick':
+        baseDir = '/ohri/projects/mattm/ceRNA/endysi'
+
     if args.p == 1:
         eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
-                     outFreq, nSamples, paramDict)
+                     outFreq, nSamples, paramDict, linearSampling=args.linear,
+                     baseDir=baseDir)
         eds.runAll()
     else:
         p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
-                       tEnd, outFreq, paramDict)
+                       tEnd, outFreq, paramDict, linearSampling=args.linear,
+                       baseDir=baseDir)
         p.runAll()

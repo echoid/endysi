@@ -1,22 +1,24 @@
-# bngl stuff for the finally final SimSys version
+# Core classes representing BioNetGen elements and ceRNA network components
 
 from __future__ import print_function, division
 import os
 import random
+import math
 import networkx as nx
 import matplotlib.pyplot as plt
 import pexpect
 from utilities import *
 
 # Global params:
-_nFlips = 1000
+_nFlips = 10000
 
 # Debugging
 _debugging = False
 
+
 class CernetModel:
     def __init__(self, home, m, n, k, index, paramDict, seed=None,
-                 volScaling=False, template=None):
+                 volScaling=False, template=None, linearSampling=True):
 
         if seed is not None:
             random.seed(seed)
@@ -46,7 +48,11 @@ class CernetModel:
         self.createMolTypes()
         self.createComplexes()
         self.createObservables()
-        self.createRulesAndParams(paramDict)
+
+        if linearSampling:
+            self.createRulesAndParams_linear(paramDict)
+        else:
+            self.createRulesAndParams_log(paramDict)
 
         self.writeNetworkFiles()
 
@@ -97,7 +103,7 @@ class CernetModel:
                 self.complexes.append(BnglComplex(ceRNA, reg))
 
     def createComplexes(self):
-        if self.m <= 1 or self.n == self.k == self.m:
+        if self.m <= 1 or self.k == 0 or self.n == self.k == self.m:
             self.createComplexes_orig()
 
         else:
@@ -147,11 +153,11 @@ class CernetModel:
         return True
 
     def createObservables(self):
-        for mol in self.ceRNAs:
+        for mol in self.molTypes:
             self.observables.append(
                 BnglObservable('Molecules', '%s_free' % mol.name, mol.bnglCode))
 
-    def createRulesAndParams(self, paramDict, volScaling=False):
+    def createRulesAndParams_linear(self, paramDict, volScaling=False):
         # Add basic cell params
         self.params.append(BnglParameter('V', paramDict['vol']))
         self.params.append(BnglParameter('NA', '6.0221415e+23'))
@@ -159,18 +165,6 @@ class CernetModel:
 
         # Production rules
         for mol in self.ceRNAs:
-            # Choose param val
-            minVal = paramDict['pT'][0]
-            maxVal = paramDict['pT'][1]
-            randVal = random.uniform(minVal, maxVal)
-            param = 'pT_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
-            mol.prodRate = randVal
-
-            # Create rule
-            self.rules.append(BnglProductionRule(mol, param))
-
-        for mol in self.miRNAs:
             # Choose param val
             minVal = paramDict['pR'][0]
             maxVal = paramDict['pR'][1]
@@ -182,13 +176,25 @@ class CernetModel:
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
 
+        for mol in self.miRNAs:
+            # Choose param val
+            minVal = paramDict['pS'][0]
+            maxVal = paramDict['pS'][1]
+            randVal = random.uniform(minVal, maxVal)
+            param = 'pS_%d' % mol.num
+            self.params.append(BnglParameter(param, randVal))
+            mol.prodRate = randVal
+
+            # Create rule
+            self.rules.append(BnglProductionRule(mol, param))
+
         # Decay rules
         for mol in self.ceRNAs:
             # Choose param val
-            minVal = paramDict['dT'][0]
-            maxVal = paramDict['dT'][1]
+            minVal = paramDict['dR'][0]
+            maxVal = paramDict['dR'][1]
             randVal = random.uniform(minVal, maxVal)
-            param = 'dT_%d' % mol.num
+            param = 'dR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
 
@@ -197,10 +203,10 @@ class CernetModel:
 
         for mol in self.miRNAs:
             # Choose param val
-            minVal = paramDict['dR'][0]
-            maxVal = paramDict['dR'][1]
+            minVal = paramDict['dS'][0]
+            maxVal = paramDict['dS'][1]
             randVal = random.uniform(minVal, maxVal)
-            param = 'dR_%d' % mol.num
+            param = 'dS_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
 
@@ -264,6 +270,121 @@ class CernetModel:
             # Partial decay
             self.rules.append(BnglDecayRule(comp, cPname,
                               remainder=miRNA.bnglCode))
+
+    def createRulesAndParams_log(self, paramDict, volScaling=False):
+        # Add basic cell params
+        #self.params.append(BnglParameter('V', paramDict['vol']))
+        #self.params.append(BnglParameter('NA', '6.0221415e+23'))
+        #self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
+
+        # Production rules
+        for mol in self.ceRNAs:
+            # Choose param val
+            minVal = paramDict['pR'][0]
+            maxVal = paramDict['pR'][1]
+            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            param = 'pR_%d' % mol.num
+            self.params.append(BnglParameter(param, randVal))
+            mol.prodRate = randVal
+
+            # Create rule
+            self.rules.append(BnglProductionRule(mol, param))
+
+        for mol in self.miRNAs:
+            # Choose param val
+            minVal = paramDict['pS'][0]
+            maxVal = paramDict['pS'][1]
+            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            param = 'pS_%d' % mol.num
+            self.params.append(BnglParameter(param, randVal))
+            mol.prodRate = randVal
+
+            # Create rule
+            self.rules.append(BnglProductionRule(mol, param))
+
+        # Decay rules
+        for mol in self.ceRNAs:
+            # Choose param val
+            minVal = paramDict['dR'][0]
+            maxVal = paramDict['dR'][1]
+            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            param = 'dR_%d' % mol.num
+            self.params.append(BnglParameter(param, randVal))
+            mol.decayRate = randVal
+
+            # Create rule
+            self.rules.append(BnglDecayRule(mol, param))
+
+        for mol in self.miRNAs:
+            # Choose param val
+            minVal = paramDict['dS'][0]
+            maxVal = paramDict['dS'][1]
+            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            param = 'dS_%d' % mol.num
+            self.params.append(BnglParameter(param, randVal))
+            mol.decayRate = randVal
+
+            # Create rule
+            self.rules.append(BnglDecayRule(mol, param))
+
+        for comp in self.complexes:
+            molX = comp.molX
+            molY = comp.molY
+
+            bMin = paramDict['b'][0]
+            bMax = paramDict['b'][1]
+            uMin = paramDict['u'][0]
+            uMax = paramDict['u'][1]
+
+            bRand = 10.0 ** math.log10(random.uniform(bMin, bMax))
+            uRand = 10.0 ** math.log10(random.uniform(uMin, uMax))
+            bName = 'b_{0}_{1}'.format(molX.num, molY.num)
+            uName = 'u_{0}_{1}'.format(molX.num, molY.num)
+            if volScaling:
+                self.params.append(BnglParameter(bName, '%s/volScale' % bRand))
+            else:
+                self.params.append(BnglParameter(bName, bRand))
+            self.params.append(BnglParameter(uName, uRand))
+            comp.kon = bRand
+            comp.koff = uRand
+
+            # Create rule
+            self.rules.append(BnglBindingRule(molX, molY, bName, uName))
+
+        # Complex decay rules
+        for comp in self.complexes:
+            molX = comp.molX
+            molY = comp.molY
+
+            aMin = paramDict['a'][0]
+            aMax = paramDict['a'][1]
+            cMin = paramDict['c'][0]
+            cMax = paramDict['c'][1]
+
+            aRand = 10.0 ** math.log10(random.uniform(aMin, aMax))
+            cRand = 10.0 ** math.log10(random.uniform(cMin, cMax))
+            aName = 'a_{0}_{1}'.format(molX.num, molY.num)
+            cName = 'c_{0}_{1}'.format(molX.num, molY.num)
+            cFname = 'cF_{0}_{1}'.format(molX.num, molY.num)
+            cPname = 'cP_{0}_{1}'.format(molX.num, molY.num)
+            self.params.append(BnglParameter(aName, aRand))
+            self.params.append(BnglParameter(cName, cRand))
+            self.params.append(BnglParameter(cFname, '%s*%s' % (aName, cName)))
+            self.params.append(BnglParameter(cPname,
+                               '%s*(1-%s)' % (aName, cName)))
+
+            miRNA = None
+            if 'miRNA' in molX.name:
+                miRNA = molX
+            else:
+                miRNA = molY
+
+            # Full decay
+            self.rules.append(BnglDecayRule(comp, cFname))
+            # Partial decay
+            self.rules.append(BnglDecayRule(comp, cPname,
+                              remainder=miRNA.bnglCode))
+            return
 
     def writeBNGL(self):
         with open('%s.bngl' % self.filePath, 'w') as bnglFile:
@@ -367,6 +488,7 @@ class RNA:
         self.partners.remove(oldP)
         self.partners.append(newP)
 
+
 class CeRNA(RNA):
     def __init__(self, num, id_):
         self.id = id_
@@ -399,6 +521,7 @@ class BnglComplex:
         self.bnglCode = ts.format(x.name, x.comps, y.name, y.comps)
         self.kon = 0.0
         self.koff = 0.0
+        self.decayRate = 0.0
 
     def rewriteCode(self):
         ts = '{0}({1}!1).{2}({3}!1)'
