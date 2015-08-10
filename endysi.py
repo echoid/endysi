@@ -610,6 +610,7 @@ class Ensemble:
 
     def calcWithinConditionCorrelations(self):
         # i.e., stochastic fluctuation correlations
+        # yeah!
         rVals = []
         for e in self.experiments:
             fn = e.model.filePath + '_ceRNA_equil_WCCs.csv'
