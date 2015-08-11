@@ -278,6 +278,7 @@ class CernetModel:
         #self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
 
         # Production rules
+        count = 0
         for mol in self.ceRNAs:
             # Choose param val
             minVal = paramDict['pR'][0]
@@ -289,7 +290,12 @@ class CernetModel:
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
+            count += 1
 
+        # confirm that the right number of rules are created
+        assert count == self.n
+
+        count = 0
         for mol in self.miRNAs:
             # Choose param val
             minVal = paramDict['pS'][0]
@@ -301,8 +307,12 @@ class CernetModel:
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
+            count += 1
+
+        assert count == self.m
 
         # Decay rules
+        count = 0
         for mol in self.ceRNAs:
             # Choose param val
             minVal = paramDict['dR'][0]
@@ -314,7 +324,11 @@ class CernetModel:
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
+            count += 1
 
+        assert count == self.n
+
+        count = 0
         for mol in self.miRNAs:
             # Choose param val
             minVal = paramDict['dS'][0]
@@ -326,7 +340,11 @@ class CernetModel:
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
+            count += 1
 
+        assert count == self.m
+
+        count = 0
         for comp in self.complexes:
             molX = comp.molX
             molY = comp.molY
@@ -350,8 +368,12 @@ class CernetModel:
 
             # Create rule
             self.rules.append(BnglBindingRule(molX, molY, bName, uName))
+            count += 1
+
+        assert count == (self.n * self.k)
 
         # Complex decay rules
+        count = 0
         for comp in self.complexes:
             molX = comp.molX
             molY = comp.molY
@@ -384,7 +406,12 @@ class CernetModel:
             # Partial decay
             self.rules.append(BnglDecayRule(comp, cPname,
                               remainder=miRNA.bnglCode))
-            return
+
+            count += 1
+
+        assert count == (self.n * self.k)
+
+        return
 
     def writeBNGL(self):
         with open('%s.bngl' % self.filePath, 'w') as bnglFile:

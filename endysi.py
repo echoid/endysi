@@ -928,7 +928,8 @@ if __name__ == '__main__':
     baseDir = None
     hostname = socket.gethostname()
     if hostname == 'crick':
-        baseDir = '/ohri/projects/mattm/ceRNA/endysi'
+        #baseDir = '/ohri/projects/mattm/ceRNA/endysi'
+        baseDir = '/scratch/matt/ceRNA/endysi'
 
     if args.p == 1:
         eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,

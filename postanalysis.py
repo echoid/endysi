@@ -1,4 +1,5 @@
-# script for calculating miRNA and ceRNA totals for the 10 by 10 network
+# Script for calculating miRNA and ceRNA totals for the 10 by 10 ceRNET
+# Just for testing right now; will be integrated into the main classes later
 
 from __future__ import print_function, division
 import os
@@ -157,7 +158,8 @@ def doit(m, n, k, s, timestamp, rootDir=None):
     # avg ceRNA trans vs avg miRNA trans
     fig = plt.figure()
     plt.scatter(allData['avg_ce_trans'], allData['avg_mi_trans'], s=10)
-    fig.suptitle('Average ceRNA transcription rate vs average miRNA transcription rate')
+    fig.suptitle('Average ceRNA transcription rate vs average miRNA ' +
+                 'transcription rate')
     plt.xlabel('average ceRNA transcription rate')
     plt.ylabel('average miRNA transcription rate')
     figName = join(resultsDir, ensembleName + '_avgCeTrans_vs_avgMiTrans.png')
@@ -178,25 +180,6 @@ def doit(m, n, k, s, timestamp, rootDir=None):
     figName = join(resultsDir, ensembleName + '_avgCeDeg_vs_avgMiDeg.png')
     plt.savefig(figName, dpi=120, bbox_inches='tight')
     plt.close(fig)
-
-    # ceRNA vs miRNA vs avg corr surface
-    #fig = plt.figure()
-    #ax = fig.gca(projection='3d')
-    #X, Y, Z = allData['ceRNA_tot'], allData['miRNA_tot'], allData['avg_corr']
-    #surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=mpl.cm.jet,
-                           #linewidth=0, antialiased=False)
-
-    ##ax.zaxis.set_major_locator(LinearLocator(10))
-    ##ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    #ax.zaxis.set_label_text('average correlation')
-    #plt.xlabel('total ceRNA (molecules)')
-    #plt.ylabel('total miRNA (molecules)')
-    #fig.colorbar(surf, shrink=0.5, aspect=5)
-
-    #figName = join(resultsDir, ensembleName + '_ceRNA_vs_miRNA_vs_avgCorr.png')
-    #plt.savefig(figName, dpi=120, bbox_inches='tight')
-    #plt.close(fig)
-
 
 if __name__ == '__main__':
     import argparse
