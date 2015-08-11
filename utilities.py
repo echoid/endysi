@@ -1,9 +1,7 @@
 # Utility functions
 
 import os
-import sys
 import time
-import glob
 
 def join(p1, p2):
     p3 = ''
@@ -79,7 +77,7 @@ def getConditionFrom(filename):
     name = getNameFrom(filename)
     s = name.split('_')
     return float(s[1])
-    
+
 def getStrConditionFrom(filename):
     name = getNameFrom(filename)
     s = name.split('_')
