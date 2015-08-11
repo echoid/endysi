@@ -28,22 +28,6 @@ _dpi = 120
 # Global setting for random seeding
 _seeding = True
 
-#paramDict = {}
-#paramDict['vol'] = 2.0e-12
-#paramDict['pR'] = (2.4e-03, 2.4e-01)
-#paramDict['pS'] = (2.4e-03, 2.4e-01)
-#paramDict['dR'] = (1e-05, 1e-03)
-#paramDict['dS'] = (2.5e-05, 2.5e-03)
-#paramDict['b'] = (1e-04, 1e-02)
-#paramDict['u'] = (1e-04, 1e-02)
-#paramDict['c'] = (7e-03, 7e-02)
-#paramDict['a'] = (0.5, 0.5)
-
-#maxHalfLife = 700000000
-#halfLifeMults = 2
-#outFreq = 10000
-#nSamples = 1
-
 # colours
 purple = '#673594'
 magenta = '#a0228d'
@@ -899,7 +883,8 @@ if __name__ == '__main__':
     parser.add_argument('--method', type=str,
                         help='Simulation method: ode or ssa')
     parser.add_argument('--linear', type=int, default=0,
-                        help='Whether to sample over linear or log space')
+                        help='Whether to sample over linear or log space' +
+                        'Default is log sampling, which works better')
 
     args = parser.parse_args()
 
@@ -925,11 +910,10 @@ if __name__ == '__main__':
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
+    # Check if we're running on the lab cluster
     baseDir = None
-    hostname = socket.gethostname()
-    if hostname == 'crick':
-        #baseDir = '/ohri/projects/mattm/ceRNA/endysi'
-        baseDir = '/scratch/matt/ceRNA/endysi'
+    if socket.gethostname() == 'crick':
+        baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
 
     if args.p == 1:
         eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
