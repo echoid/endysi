@@ -46,13 +46,9 @@ the running environment without messing with system libraries.
 have the above dependencies installed.  
 
 2. cd into the directory above and run:
-
 `python2 endysi.py --help`
-
 This will tell you about the command line arguments.  For example:
-
 `python2 endysi.py -m 5 -n 10 -k 2 -s 100 --method ode`
-
 will create 100 networks with 5 miRNAs and 10 ceRNAs with each miRNA 
 targeting 2 ceRNAs and each ceRNA targeted by 2 miRNAs; these networks 
 will then be simulated as systems of ODEs.  The other option for 
