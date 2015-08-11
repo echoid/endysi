@@ -1,5 +1,5 @@
-# Script for calculating miRNA and ceRNA totals for the 10 by 10 ceRNET
-# Just for testing right now; will be integrated into the main classes later
+# Script for steady state analysis of 10 by 10 ceRNA networks.
+# Just for testing right now; will be integrated into the main classes later.
 
 from __future__ import print_function, division
 import os
