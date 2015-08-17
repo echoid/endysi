@@ -688,8 +688,9 @@ class Ensemble:
         # Write results to files
         fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCs.csv')
         _writeDataToCSV(fn, self.ceEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
-        fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCCs')
-        _histogram(fn, self.ceEquilCCs['r'], 'r')
+        if len(cePairs) > 1:
+            fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCCs')
+            _histogram(fn, self.ceEquilCCs['r'], 'r')
 
         return
 
