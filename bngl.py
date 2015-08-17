@@ -272,18 +272,15 @@ class CernetModel:
                               remainder=miRNA.bnglCode))
 
     def createRulesAndParams_log(self, paramDict, volScaling=False):
-        # Add basic cell params
-        #self.params.append(BnglParameter('V', paramDict['vol']))
-        #self.params.append(BnglParameter('NA', '6.0221415e+23'))
-        #self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
-
         # Production rules
         count = 0
         for mol in self.ceRNAs:
             # Choose param val
             minVal = paramDict['pR'][0]
             maxVal = paramDict['pR'][1]
-            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            #randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            randVal = math.exp(random.uniform(math.log(minVal),
+                                              math.log(maxVal)))
             param = 'pR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.prodRate = randVal
@@ -300,7 +297,8 @@ class CernetModel:
             # Choose param val
             minVal = paramDict['pS'][0]
             maxVal = paramDict['pS'][1]
-            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            randVal = math.exp(random.uniform(math.log(minVal),
+                                              math.log(maxVal)))
             param = 'pS_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.prodRate = randVal
@@ -317,7 +315,9 @@ class CernetModel:
             # Choose param val
             minVal = paramDict['dR'][0]
             maxVal = paramDict['dR'][1]
-            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            randVal = math.exp(random.uniform(math.log(minVal),
+                                              math.log(maxVal)))
+
             param = 'dR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
@@ -333,7 +333,9 @@ class CernetModel:
             # Choose param val
             minVal = paramDict['dS'][0]
             maxVal = paramDict['dS'][1]
-            randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            randVal = math.exp(random.uniform(math.log(minVal),
+                                              math.log(maxVal)))
+
             param = 'dS_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
@@ -354,8 +356,11 @@ class CernetModel:
             uMin = paramDict['u'][0]
             uMax = paramDict['u'][1]
 
-            bRand = 10.0 ** math.log10(random.uniform(bMin, bMax))
-            uRand = 10.0 ** math.log10(random.uniform(uMin, uMax))
+            bRand = math.exp(random.uniform(math.log(bMin),
+                                              math.log(bMax)))
+            uRand = math.exp(random.uniform(math.log(uMin),
+                                              math.log(uMax)))
+
             bName = 'b_{0}_{1}'.format(molX.num, molY.num)
             uName = 'u_{0}_{1}'.format(molX.num, molY.num)
             if volScaling:
@@ -383,8 +388,11 @@ class CernetModel:
             cMin = paramDict['c'][0]
             cMax = paramDict['c'][1]
 
-            aRand = 10.0 ** math.log10(random.uniform(aMin, aMax))
-            cRand = 10.0 ** math.log10(random.uniform(cMin, cMax))
+            aRand = math.exp(random.uniform(math.log(aMin),
+                                              math.log(aMax)))
+            cRand = math.exp(random.uniform(math.log(cMin),
+                                              math.log(cMax)))
+
             aName = 'a_{0}_{1}'.format(molX.num, molY.num)
             cName = 'c_{0}_{1}'.format(molX.num, molY.num)
             cFname = 'cF_{0}_{1}'.format(molX.num, molY.num)

@@ -905,7 +905,7 @@ if __name__ == '__main__':
     nSamples = 1
 
     if args.method == 'ssa':
-        outFreq = 100
+        outFreq = 10000
         nSamples = 100
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
