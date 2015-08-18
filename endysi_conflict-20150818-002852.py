@@ -462,7 +462,8 @@ class Experiment:
 
 class Ensemble:
     def __init__(self, m, n, k, size, method, tEnd, outFreq, nSamples,
-                 paramDict, timestamp=None, baseDir=None, linearSampling=1):
+                 paramDict, timestamp=None, baseDir=None, seedScale=None,
+                 linearSampling=1):
 
         if timestamp is None:
             self.timestamp = genTimeString()
@@ -481,6 +482,7 @@ class Ensemble:
         self.experiments = []
         self.nSamples = nSamples
         self.linearSampling = bool(linearSampling)
+        self.seedScale = seedScale
 
         self.createDirectories(baseDir)
 
@@ -707,10 +709,10 @@ class Ensemble:
         tStart = time.time()
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
-            if _seeding:
-                s = i
-            else:
-                s = None
+
+            s = None
+            if _seeding and self.seedScale is not None:
+                s = i * self.seedScale
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      paramDict, seed=s,
@@ -832,12 +834,19 @@ class Population:
 
     def runAll(self):
         tStart = time.time()
+        offset = 0
         for i in range(self.p):
             if _logging:
                 self.logger.info('Running simulations on ' + e.name)
+
+            sScale = None
+            if _seeding:
+                sScale = 999 + offset
+                offset += 3
+
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
                          self.outFreq, 1, self.paramDict, baseDir=self.dataDir,
-                         timestamp='e%d' % (i + 1),
+                         timestamp='e%d' % (i + 1), seedScale=sScale,
                          linearSampling=self.linearSampling)
             e.runAll()
             self.ensembles.append(e)
