@@ -28,6 +28,9 @@ _dpi = 120
 # Global setting for random seeding
 _seeding = True
 
+# global setting for alpha ranging
+_rangingAlpha = True
+
 # colours
 purple = '#673594'
 magenta = '#a0228d'
@@ -194,6 +197,7 @@ class Experiment:
         self.simulator.saveConcentrations()
 
         self.simulator.done()
+        self.simulator.close()
 
         return
 
@@ -234,7 +238,7 @@ class Experiment:
                 #self.perturbSS[molName] = self.perturbData[mol][-1]
 
         # Write steady states to file
-        fn = self.model.filePath + '_equil_steadyStates.csv'
+        fn = self.model.filePath + '_steadyStates.csv'
         _writeDataToCSV(fn, self.equilSS)
 
         return
@@ -288,7 +292,7 @@ class Experiment:
             count += 1
 
         # Write results to files
-        fn = self.model.filePath + '_ceRNA_equil_WCCs.csv'
+        fn = self.model.filePath + '_ceRNA_WCCs.csv'
         _writeDataToCSV(fn, self.ceEquilWCCs, frmt=('%20s', '%.18e', '%.18e'))
 
         return
@@ -323,14 +327,14 @@ class Experiment:
 
     def plotTrajectories(self, ddpi=120):
         # Plot miRNAs
-        fn = join(self.model.plotDir, self.model.name + '_miRNA_equil_traj')
+        fn = join(self.model.plotDir, self.model.name + '_miRNA_traj')
         _plotAllTrajectories(fn, self.equilData, self.miRNAs)
 
         #fn = join(self.model.plotDir, self.model.name + '_miRNA_perturb_traj')
         #_plotAllTrajectories(fn, self.perturbData, self.miRNAs)
 
         # Plot ceRNAs
-        fn = join(self.model.plotDir, self.model.name + '_ceRNA_equil_traj')
+        fn = join(self.model.plotDir, self.model.name + '_ceRNA_traj')
         _plotAllTrajectories(fn, self.equilData, self.ceRNAs)
         return
 
@@ -349,6 +353,9 @@ class Experiment:
                 f.write(miRNA.name + ': ' + str(p) + '\n')
 
         return
+
+    def gatherParams(self):
+        pass
 
     def makeScatterPlots(self):
         # gather params
@@ -437,7 +444,7 @@ class Experiment:
             plt.plot(self.equilData[pair[0]], self.equilData[pair[1]],
                      colours[i])
             i += 1
-        fn = join(self.model.plotDir, self.model.name + '_equil_foldPlots.png')
+        fn = join(self.model.plotDir, self.model.name + '_foldPlots.png')
         plt.savefig(fn, dpi=ddpi, bbox_inches='tight')
         plt.close(fig)
         return
@@ -448,8 +455,8 @@ class Experiment:
         if self.method == 'ssa':
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
-        self.plotTrajectories()
-        self.makeScatterPlots()
+        #self.plotTrajectories()
+        #self.makeScatterPlots()
         self.writeBindingPartners()
         #self.makeFoldPlots()
         #self.deleteData()
@@ -462,7 +469,8 @@ class Experiment:
 
 class Ensemble:
     def __init__(self, m, n, k, size, method, tEnd, outFreq, nSamples,
-                 paramDict, timestamp=None, baseDir=None, linearSampling=1):
+                 randParams, timestamp=None, baseDir=None, seedScale=None,
+                 alpha=None, linearSampling=1):
 
         if timestamp is None:
             self.timestamp = genTimeString()
@@ -481,6 +489,9 @@ class Ensemble:
         self.experiments = []
         self.nSamples = nSamples
         self.linearSampling = bool(linearSampling)
+        self.seedScale = seedScale
+        self.randParams = randParams
+        self.alpha = alpha
 
         self.createDirectories(baseDir)
 
@@ -490,7 +501,7 @@ class Ensemble:
                    'N={2}, K={3}'
             self.logger.info(msg.format(size, m, n, k))
             self.logger.info('Parameter ranges are as follows:')
-            self.logger.info(str(paramDict))
+            self.logger.info(str(randParams))
 
             self.logger.info('Creating models...')
 
@@ -505,7 +516,21 @@ class Ensemble:
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
 
+        with open(join(self.curRun, 'alpha'), 'w') as aFile:
+            aFile.write('alpha=' + str(self.alpha))
+
         return
+
+    def purge(self):
+        del self.randParams
+        del self.tEnd
+        del self.linearSampling
+        del self.m
+        del self.n
+        del self.k
+        del self.size
+        del self.method
+        del self.nSamples
 
     def createLoggers(self):
         # create loggers and set levels
@@ -547,11 +572,11 @@ class Ensemble:
         makeDirs(self.resultsDir)
         return
 
-    def createModels(self, paramDict):
+    def createModels(self, randParams):
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, seed=None)
+                                     randParams, seed=None)
 
             self.models.append(model)
         return
@@ -587,17 +612,53 @@ class Ensemble:
                 self.equilSS[name][i - 1] = experiment.equilSS[name][0]
 
         # Write to file
-        fn = join(self.resultsDir, self.name + '_equil_steadyStates.csv')
+        fn = join(self.resultsDir, self.name + '_steadyStates.csv')
         _writeDataToCSV(fn, self.equilSS)
 
         return
+
+    def calcMolSums(self):
+        names = self.experiments[0].equilSS.dtype.names
+        dt = [('model', 'i4'), ('miTot', 'f8'), ('ceTot', 'f8')]
+        equilSums = np.zeros(self.size, dtype=dt)
+
+        for experiment in self.experiments:
+            i = experiment.model.index
+            equilSums['model'][i - 1] = i
+            miTot = 0
+            ceTot = 0
+            for name in names:
+                if 'mi' in name:
+                    miTot += experiment.equilSS[name][0]
+                elif 'ce' in name:
+                    ceTot += experiment.equilSS[name][0]
+
+            equilSums['miTot'][i - 1] = miTot
+            equilSums['ceTot'][i - 1] = ceTot
+
+        # normalize
+        normSums = np.copy(equilSums)
+        maxR = max(max(equilSums['miTot']), max(equilSums['ceTot']))
+
+        for i in range(self.size):
+            ovs = equilSums['miTot'][i]
+            ovr = equilSums['ceTot'][i]
+            normSums['miTot'][i] = ovs / maxR
+            normSums['ceTot'][i] = ovr / maxR
+
+        # Write to files
+        fn = join(self.resultsDir, self.name + '_sums.csv')
+        _writeDataToCSV(fn, equilSums)
+
+        fn = join(self.resultsDir, self.name + '_normSums.csv')
+        _writeDataToCSV(fn, normSums)
 
     def calcWithinConditionCorrelations(self):
         # i.e., stochastic fluctuation correlations
         # yeah!
         rVals = []
         for e in self.experiments:
-            fn = e.model.filePath + '_ceRNA_equil_WCCs.csv'
+            fn = e.model.filePath + '_ceRNA_WCCs.csv'
             da = np.genfromtxt(fn, delimiter=';', names=True)
 
             if self.n <= 2:
@@ -655,13 +716,16 @@ class Ensemble:
         # Pair up molecules for correlations
         names = self.experiments[0].equilSS.dtype.names
         ceRNAs = [name for name in names if 'ceRNA' in name]
-        #miRNAs = [name for name in names if 'miRNA' in name]
+        miRNAs = [name for name in names if 'miRNA' in name]
         cePairs = list(combinations(ceRNAs, 2))
-        #miPairs = list(combinations(miRNAs, 2))
+        if self.m >= 2:
+            miPairs = list(combinations(miRNAs, 2))
 
         # Create tables for results
-        self.ceEquilCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
-                                                ('r', 'f8'), ('p', 'f8')])
+        dt = [('mol pair', 'a20'), ('r', 'f8'), ('p', 'f8')]
+        self.ceEquilCCs = np.zeros(len(cePairs), dtype=dt)
+        if self.m >= 2:
+            self.miEquilCCs = np.zeros(len(miPairs), dtype=dt)
 
         # Do the calculations
         # ceRNAs
@@ -686,16 +750,42 @@ class Ensemble:
             count += 1
 
         # Write results to files
-        fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCs.csv')
+        fn = join(self.resultsDir, self.name + '_ceRNA_CCs.csv')
         _writeDataToCSV(fn, self.ceEquilCCs, frmt=('%20s', '%.18e', '%.18e'))
-        if len(cePairs) > 1:
-            fn = join(self.resultsDir, self.name + '_ceRNA_equil_CCCs')
-            _histogram(fn, self.ceEquilCCs['r'], 'r')
+
+        # miRNAs
+        # Equil steady states
+        if self.m >= 2:
+            count = 0
+            for pair in miPairs:
+                mol1 = pair[0]
+                mol2 = pair[1]
+                mol1data = self.equilSS[mol1]
+                mol2data = self.equilSS[mol2]
+
+                (r, p) = pearsonr(mol1data, mol2data)
+
+                if math.isnan(r):
+                    r = 0.0
+
+                pairString = '(%s, %s)' % (mol1, mol2)
+                self.miEquilCCs['mol pair'][count] = pairString
+                self.miEquilCCs['r'][count] = r
+                self.miEquilCCs['p'][count] = p
+
+                count += 1
+
+            # Write results to files
+            fn = join(self.resultsDir, self.name + '_miRNA_CCs.csv')
+            _writeDataToCSV(fn, self.miEquilCCs, frmt=('%20s', '%.18e',
+                                                       '%.18e'))
 
         return
 
     def runAnalyses(self):
         self.collectSteadyStates()
+        self.calcMolSums()
+
         if self.method == 'ode':
             self.calcCrossConditionCorrelations()
         else:
@@ -707,13 +797,13 @@ class Ensemble:
         tStart = time.time()
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
-            if _seeding:
-                s = i
-            else:
-                s = None
+
+            s = None
+            if _seeding and self.seedScale is not None:
+                s = i * self.seedScale
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     paramDict, seed=s,
+                                     self.randParams, alpha=self.alpha, seed=s,
                                      linearSampling=self.linearSampling)
 
             e = Experiment(self, self.method, model, self.tEnd, self.outFreq,
@@ -735,8 +825,9 @@ class Ensemble:
 
 
 class Population:
-    def __init__(self, p, m, n, k, s, method, tEnd, outFreq, paramDict,
-                 timestamp=None, baseDir=None, linearSampling=1):
+    def __init__(self, p, m, n, k, s, method, tEnd, outFreq, randParams,
+                 fixedParams=None, timestamp=None, baseDir=None,
+                 rangingAlpha=False, linearSampling=1):
 
         if timestamp is None:
             self.timestamp = genTimeString()
@@ -751,18 +842,13 @@ class Population:
         self.method = method
         self.tEnd = tEnd
         self.outFreq = outFreq
-        self.paramDict = paramDict
+        self.randParams = randParams
+        self.fixedParams = fixedParams
         self.name = 'Pop@%d_%dx%dc%dx%d' % (p, m, n, k, s)
         self.ensembles = []
-
-        if baseDir is None:
-            self.rootDir = join(os.path.expanduser('~'),
-                            'research/results/ceRNA/endysi/' + self.name)
-        else:
-            self.rootDir = join(baseDir, 'ceRNA/endysi' + self.name)
-
-        self.createDirectories()
+        self.createDirectories(baseDir)
         self.linearSampling = bool(linearSampling)
+        self.rangingAlpha = rangingAlpha
 
         if _logging:
             self.createLoggers()
@@ -781,11 +867,15 @@ class Population:
             riFile.write('n = %d\n' % self.n)
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
+            riFile.write('rangingAlpha: ' + str(self.rangingAlpha) + '\n')
         return
 
-    def createDirectories(self):
-        self.rootDir = join(os.path.expanduser('~'),
+    def createDirectories(self, baseDir):
+        if baseDir is None:
+            self.rootDir = join(os.path.expanduser('~'),
                             'research/results/ceRNA/endysi/' + self.name)
+        else:
+            self.rootDir = join(baseDir, self.name)
 
         self.curRun = join(self.rootDir, self.timestamp)
         self.dataDir = join(self.curRun, 'data')
@@ -794,13 +884,13 @@ class Population:
         makeDirs(self.resultsDir)
         return
 
-    def createEnsembles(self, m, n, k, s, method, tEnd, outFreq, paramDict):
+    def createEnsembles(self, m, n, k, s, method, tEnd, outFreq, randParams):
         if _logging:
             self.logger.info('Creating ensembles')
         self.ensembles = []
         for i in range(self.p):
             self.ensembles.append(Ensemble(m, n, k, s, method, tEnd,
-                                  outFreq, paramDict, baseDir=self.dataDir,
+                                  outFreq, randParams, baseDir=self.dataDir,
                                   timestamp='e%d' % (i + 1)))
         return
 
@@ -832,14 +922,30 @@ class Population:
 
     def runAll(self):
         tStart = time.time()
+        offset = 0
+        alphas = None
+        if self.rangingAlpha:
+            alphas = np.linspace(0.01, 1, self.p)
+
         for i in range(self.p):
             if _logging:
                 self.logger.info('Running simulations on ' + e.name)
+
+            sScale = None
+            if _seeding:
+                sScale = 999 + offset
+                offset += 3
+
+            a = None
+            if self.rangingAlpha:
+                a = alphas[i]
+
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
-                         self.outFreq, 1, self.paramDict, baseDir=self.dataDir,
-                         timestamp='e%d' % (i + 1),
-                         linearSampling=self.linearSampling)
+                         self.outFreq, 1, self.randParams, baseDir=self.dataDir,
+                         timestamp='e%d' % (i + 1), seedScale=sScale,
+                         linearSampling=self.linearSampling, alpha=a)
             e.runAll()
+            e.purge()
             self.ensembles.append(e)
 
         self.runAnalysis()
@@ -849,23 +955,107 @@ class Population:
         print('Time elapsed: %f' % tElapsed)
         return
 
-    def runAnalysis(self):
-        rVals = []
+    def plotAlphas(self):
+        dt = [('alpha', 'f8'), ('totR', 'f8'), ('totS', 'f8'), ('r', 'f8')]
+        da = np.zeros(self.p, dtype=dt)
+
+        count = 0
         for e in self.ensembles:
-            fn = e.name + '_ceRNA_equil_CCs.csv'
-            da = np.genfromtxt(join(e.resultsDir, fn), delimiter=';',
+            fn = e.name + '_ceRNA_CCs.csv'
+            ccd = np.genfromtxt(join(e.resultsDir, fn), delimiter=';',
                                names=True)
+            fs = e.name + '_steadyStates.csv'
+            ssd = np.genfromtxt(join(e.resultsDir, fs), delimiter=';',
+                                names=True)
+
+            alpha = 0
+            with open(join(e.curRun, 'alpha'), 'r') as af:
+                alpha = float(af.readline().split('=')[1])
+
+            da['alpha'][count] = alpha
 
             if self.n <= 2:
-                rVals.append(da['r'])
+                da['r'][count] = ccd['r']
             else:
-                rVals.extend(da['r'])
+                da['r'][count] = np.mean(ccd['r'])
 
-        fp = join(self.resultsDir, self.name + '_allCorrs')
-        _histogram(fp, rVals, 'r')
+            totR = 0
+            totS = 0
+            for name in ssd.dtype.names:
+                if 'miRNA' in name:
+                    totS += sum(ssd[name])
+                elif 'ceRNA' in name:
+                    totR += sum(ssd[name])
 
-        fn = join(self.resultsDir, self.name + '_allCorrs.csv')
-        _writeListToCSV(fn, rVals, 'r')
+            da['totR'][count] = totR
+            da['totS'][count] = totS
+            count += 1
+
+        # normalize RNA counts
+        am = max(max(da['totR']), max(da['totS']))
+
+        for i in range(self.p):
+            ovs = da['totS'][i]
+            ovr = da['totR'][i]
+            da['totS'][i] = ovs / am
+            da['totR'][i] = ovr / am
+
+        fn = join(self.resultsDir, self.name + '_normSums.csv')
+        _writeDataToCSV(fn, da)
+
+        fig = plt.figure()
+        plt.plot(da['alpha'], da['totR'], label='ceRNA')
+        plt.plot(da['alpha'], da['totS'], label='miRNA')
+        plt.plot(da['alpha'], da['r'], label='r')
+        plt.xlabel('alpha')
+        plt.legend()
+        fn = join(self.resultsDir, self.name + '_normSumsVsAlpha.png')
+        plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
+        plt.close(fig)
+
+    def collectCrossConditionCorrelations(self):
+        ceCCs = []
+        miCCs = []
+
+        for e in self.ensembles:
+            fn = join(e.resultsDir, e.name + '_ceRNA_CCs.csv')
+            ceda = np.genfromtxt(fn, delimiter=';', names=True)
+
+            if self.n <= 2:
+                ceCCs.append(ceda['r'])
+            else:
+                ceCCs.extend(ceda['r'])
+
+        fp = join(self.resultsDir, self.name + '_ceCCs')
+        _histogram(fp, ceCCs, 'r')
+
+        fn = join(self.resultsDir, self.name + '_ceCCs.csv')
+        _writeListToCSV(fn, ceCCs, 'r')
+
+        if self.m >= 2:
+            for e in self.ensembles:
+                fn = join(e.resultsDir, e.name + '_miRNA_CCs.csv')
+                mida = np.genfromtxt(fn, delimiter=';', names=True)
+
+                if self.m >= 2:
+                    if self.m == 2:
+                        miCCs.append(mida['r'])
+                    else:
+                        miCCs.extend(mida['r'])
+
+            fp = join(self.resultsDir, self.name + '_miCCs')
+            _histogram(fp, miCCs, 'r')
+
+            fn = join(self.resultsDir, self.name + '_miCCs.csv')
+            _writeListToCSV(fn, miCCs, 'r')
+
+        return
+
+    def runAnalysis(self):
+        self.collectCrossConditionCorrelations()
+
+        if self.rangingAlpha:
+            self.plotAlphas()
 
         return
 
@@ -886,27 +1076,28 @@ if __name__ == '__main__':
     parser.add_argument('--linear', type=int, default=0,
                         help='Whether to sample over linear or log space' +
                         'Default is log sampling, which works better')
+    parser.add_argument('--alpha', type=int, default=0,
+                        help='Range alpha parameter; default off (0)')
+    parser.add_argument('-o', type=int, default=2000, help='Output frequency')
 
     args = parser.parse_args()
 
-    paramDict = {}
-    paramDict['vol'] = 2.0e-12
-    paramDict['pR'] = (2.4e-03, 2.4e-01)
-    paramDict['pS'] = (2.4e-03, 2.4e-01)
-    paramDict['dR'] = (1e-05, 1e-03)
-    paramDict['dS'] = (2.5e-05, 2.5e-03)
-    paramDict['b'] = (1e-04, 1e-02)
-    paramDict['u'] = (1e-04, 1e-02)
-    paramDict['c'] = (7e-03, 7e-02)
-    paramDict['a'] = (0.5, 0.5)
+    randParams = {}
+    randParams['vol'] = 2.0e-12
+    randParams['pR'] = (2.4e-03, 2.4e-01)
+    randParams['pS'] = (2.4e-03, 2.4e-01)
+    randParams['dR'] = (1e-05, 1e-03)
+    randParams['dS'] = (2.5e-05, 2.5e-03)
+    randParams['b'] = (1e-04, 1e-02)
+    randParams['u'] = (1e-04, 1e-02)
+    randParams['c'] = (7e-03, 7e-02)
+    randParams['a'] = (0.5, 0.5)
 
     maxHalfLife = 700000000
     halfLifeMults = 2
-    outFreq = 1000
     nSamples = 1
 
     if args.method == 'ssa':
-        outFreq = 10000
         nSamples = 100
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
@@ -918,11 +1109,12 @@ if __name__ == '__main__':
 
     if args.p == 1:
         eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
-                     outFreq, nSamples, paramDict, linearSampling=args.linear,
+                     args.o, nSamples, randParams, linearSampling=args.linear,
                      baseDir=baseDir)
         eds.runAll()
     else:
+        a = bool(args.alpha)
         p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
-                       tEnd, outFreq, paramDict, linearSampling=args.linear,
-                       baseDir=baseDir)
+                       tEnd, args.o, randParams, linearSampling=args.linear,
+                       baseDir=baseDir, rangingAlpha=a)
         p.runAll()

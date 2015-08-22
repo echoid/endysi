@@ -17,8 +17,8 @@ _debugging = False
 
 
 class CernetModel:
-    def __init__(self, home, m, n, k, index, paramDict, seed=None,
-                 volScaling=False, template=None, linearSampling=True):
+    def __init__(self, home, m, n, k, index, paramDict, seed=None, alpha=None,
+                 volScaling=False, template=None, linearSampling=False):
 
         if seed is not None:
             random.seed(seed)
@@ -35,6 +35,7 @@ class CernetModel:
         self.m = m
         self.n = n
         self.k = k
+        self.alpha = alpha
         self.ceRNAs = []
         self.miRNAs = []
         self.complexes = []
@@ -48,12 +49,8 @@ class CernetModel:
         self.createMolTypes()
         self.createComplexes()
         self.createObservables()
-
-        if linearSampling:
-            self.createRulesAndParams_linear(paramDict)
-        else:
-            self.createRulesAndParams_log(paramDict)
-
+        self.createRulesAndParams(paramDict, linearSampling=linearSampling,
+                                  alpha=alpha)
         self.writeNetworkFiles()
 
     def purge(self):
@@ -157,62 +154,97 @@ class CernetModel:
             self.observables.append(
                 BnglObservable('Molecules', '%s_free' % mol.name, mol.bnglCode))
 
-    def createRulesAndParams_linear(self, paramDict, volScaling=False):
+    def createRulesAndParams(self, paramDict, volScaling=False, alpha=None,
+                             linearSampling=False):
         # Add basic cell params
         self.params.append(BnglParameter('V', paramDict['vol']))
         self.params.append(BnglParameter('NA', '6.0221415e+23'))
         self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
 
+        count = 0
         # Production rules
         for mol in self.ceRNAs:
             # Choose param val
             minVal = paramDict['pR'][0]
             maxVal = paramDict['pR'][1]
-            randVal = random.uniform(minVal, maxVal)
+            if linearSampling:
+                randVal = random.uniform(minVal, maxVal)
+            else:
+                randVal = math.exp(random.uniform(math.log(minVal),
+                                              math.log(maxVal)))
             param = 'pR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.prodRate = randVal
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
+            count += 1
 
+        # confirm correct number of rules made
+        assert count == self.n
+
+        count = 0
         for mol in self.miRNAs:
             # Choose param val
             minVal = paramDict['pS'][0]
             maxVal = paramDict['pS'][1]
-            randVal = random.uniform(minVal, maxVal)
+            if linearSampling:
+                randVal = random.uniform(minVal, maxVal)
+            else:
+                randVal = math.exp(random.uniform(math.log(minVal),
+                                              math.log(maxVal)))
             param = 'pS_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.prodRate = randVal
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
+            count += 1
+
+        assert count == self.m
 
         # Decay rules
+        count = 0
         for mol in self.ceRNAs:
             # Choose param val
             minVal = paramDict['dR'][0]
             maxVal = paramDict['dR'][1]
-            randVal = random.uniform(minVal, maxVal)
+            if linearSampling:
+                randVal = random.uniform(minVal, maxVal)
+            else:
+                randVal = math.exp(random.uniform(math.log(minVal),
+                                                  math.log(maxVal)))
             param = 'dR_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
+            count += 1
 
+        assert count == self.n
+
+        count = 0
         for mol in self.miRNAs:
             # Choose param val
             minVal = paramDict['dS'][0]
             maxVal = paramDict['dS'][1]
-            randVal = random.uniform(minVal, maxVal)
+            if linearSampling:
+                randVal = random.uniform(minVal, maxVal)
+            else:
+                randVal = math.exp(random.uniform(math.log(minVal),
+                                                  math.log(maxVal)))
             param = 'dS_%d' % mol.num
             self.params.append(BnglParameter(param, randVal))
             mol.decayRate = randVal
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
+            count += 1
 
+        assert count == self.m
+
+        count = 0
         for comp in self.complexes:
             molX = comp.molX
             molY = comp.molY
@@ -222,22 +254,35 @@ class CernetModel:
             uMin = paramDict['u'][0]
             uMax = paramDict['u'][1]
 
-            bRand = random.uniform(bMin, bMax)
-            uRand = random.uniform(uMin, uMax)
+            if linearSampling:
+                bRand = random.uniform(bMin, bMax)
+                uRand = random.uniform(uMin, uMax)
+            else:
+                bRand = math.exp(random.uniform(math.log(bMin),
+                                                math.log(bMax)))
+                uRand = math.exp(random.uniform(math.log(uMin),
+                                                math.log(uMax)))
+
             bName = 'b_{0}_{1}'.format(molX.num, molY.num)
             uName = 'u_{0}_{1}'.format(molX.num, molY.num)
+
             if volScaling:
                 self.params.append(BnglParameter(bName, '%s/volScale' % bRand))
             else:
                 self.params.append(BnglParameter(bName, bRand))
+
             self.params.append(BnglParameter(uName, uRand))
             comp.kon = bRand
             comp.koff = uRand
 
             # Create rule
             self.rules.append(BnglBindingRule(molX, molY, bName, uName))
+            count += 1
+
+        assert count == (self.n * self.k)
 
         # Complex decay rules
+        count = 0
         for comp in self.complexes:
             molX = comp.molX
             molY = comp.molY
@@ -247,8 +292,23 @@ class CernetModel:
             cMin = paramDict['c'][0]
             cMax = paramDict['c'][1]
 
-            aRand = random.uniform(aMin, aMax)
-            cRand = random.uniform(cMin, cMax)
+            if linearSampling:
+                if alpha is None:
+                    aRand = random.uniform(aMin, aMax)
+                else:
+                    aRand = alpha
+
+                cRand = random.uniform(cMin, cMax)
+            else:
+                if alpha is None:
+                    aRand = math.exp(random.uniform(math.log(aMin),
+                                                    math.log(aMax)))
+                else:
+                    aRand = alpha
+
+                cRand = math.exp(random.uniform(math.log(cMin),
+                                                math.log(cMax)))
+
             aName = 'a_{0}_{1}'.format(molX.num, molY.num)
             cName = 'c_{0}_{1}'.format(molX.num, molY.num)
             cFname = 'cF_{0}_{1}'.format(molX.num, molY.num)
@@ -270,6 +330,9 @@ class CernetModel:
             # Partial decay
             self.rules.append(BnglDecayRule(comp, cPname,
                               remainder=miRNA.bnglCode))
+            count += 1
+
+        assert count == (self.n * self.k)
 
     def createRulesAndParams_log(self, paramDict, volScaling=False):
         # Production rules
