@@ -955,11 +955,11 @@ class Population:
         print('Time elapsed: %f' % tElapsed)
         return
 
-    def plotAlphas(self):
-        dt = [('alpha', 'f8'), ('totR', 'f8'), ('totS', 'f8'), ('r', 'f8')]
+    def alphaAnalysis(self):
+        dt = [('alpha', 'f8'), ('normR', 'f8'), ('normS', 'f8'), ('rAvg', 'f8')]
         da = np.zeros(self.p, dtype=dt)
 
-        count = 0
+        i = 0
         for e in self.ensembles:
             fn = e.name + '_ceRNA_CCs.csv'
             ccd = np.genfromtxt(join(e.resultsDir, fn), delimiter=';',
@@ -972,12 +972,8 @@ class Population:
             with open(join(e.curRun, 'alpha'), 'r') as af:
                 alpha = float(af.readline().split('=')[1])
 
-            da['alpha'][count] = alpha
-
-            if self.n <= 2:
-                da['r'][count] = ccd['r']
-            else:
-                da['r'][count] = np.mean(ccd['r'])
+            da['alpha'][i] = alpha
+            da['rAvg'][i] = np.mean(ccd['rAvg'])
 
             totR = 0
             totS = 0
@@ -987,22 +983,19 @@ class Population:
                 elif 'ceRNA' in name:
                     totR += sum(ssd[name])
 
-            da['totR'][count] = totR
-            da['totS'][count] = totS
-            count += 1
+            denom = totR + totS
+            normR = totR / denom
+            normS = totS / denom
 
-        # normalize RNA counts
-        am = max(max(da['totR']), max(da['totS']))
+            da['normR'][i] = normR
+            da['normS'][i] = normS
+            i += 1
 
-        for i in range(self.p):
-            ovs = da['totS'][i]
-            ovr = da['totR'][i]
-            da['totS'][i] = ovs / am
-            da['totR'][i] = ovr / am
-
+        # write data to file
         fn = join(self.resultsDir, self.name + '_normSums.csv')
         _writeDataToCSV(fn, da)
 
+        # plot normalized RNA levels and R against alpha
         fig = plt.figure()
         plt.plot(da['alpha'], da['totR'], label='ceRNA')
         plt.plot(da['alpha'], da['totS'], label='miRNA')
@@ -1055,7 +1048,7 @@ class Population:
         self.collectCrossConditionCorrelations()
 
         if self.rangingAlpha:
-            self.plotAlphas()
+            self.alphaAnalysis()
 
         return
 
