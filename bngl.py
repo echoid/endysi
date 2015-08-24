@@ -18,7 +18,8 @@ _debugging = False
 
 class CernetModel:
     def __init__(self, home, m, n, k, index, paramDict, seed=None, alpha=None,
-                 volScaling=False, template=None, linearSampling=False):
+                 volScaling=False, template=None, linearSampling=False,
+                 reinit=False):
 
         if seed is not None:
             random.seed(seed)
@@ -51,7 +52,9 @@ class CernetModel:
         self.createObservables()
         self.createRulesAndParams(paramDict, linearSampling=linearSampling,
                                   alpha=alpha)
-        self.writeNetworkFiles()
+
+        if not reinit:
+            self.writeNetworkFiles()
 
     def purge(self):
         del self.ceRNAs
