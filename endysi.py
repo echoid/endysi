@@ -973,7 +973,7 @@ class Population:
                 alpha = float(af.readline().split('=')[1])
 
             da['alpha'][i] = alpha
-            da['rAvg'][i] = np.mean(ccd['rAvg'])
+            da['rAvg'][i] = np.mean(ccd['r'])
 
             totR = 0
             totS = 0
@@ -997,9 +997,9 @@ class Population:
 
         # plot normalized RNA levels and R against alpha
         fig = plt.figure()
-        plt.plot(da['alpha'], da['totR'], label='ceRNA')
-        plt.plot(da['alpha'], da['totS'], label='miRNA')
-        plt.plot(da['alpha'], da['r'], label='r')
+        plt.plot(da['alpha'], da['normR'], label='normalized ceRNA')
+        plt.plot(da['alpha'], da['normS'], label='normalized miRNA')
+        plt.plot(da['alpha'], da['rAvg'], label='average r')
         plt.xlabel('alpha')
         plt.legend()
         fn = join(self.resultsDir, self.name + '_normSumsVsAlpha.png')
@@ -1072,19 +1072,21 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', type=int, default=0,
                         help='Range alpha parameter; default off (0)')
     parser.add_argument('-o', type=int, default=2000, help='Output frequency')
+    parser.add_argument('-t', type=str, default='',
+                        help='timestamp for restart')
 
     args = parser.parse_args()
 
     randParams = {}
-    randParams['vol'] = 2.0e-12
-    randParams['pR'] = (2.4e-03, 2.4e-01)
-    randParams['pS'] = (2.4e-03, 2.4e-01)
-    randParams['dR'] = (1e-05, 1e-03)
-    randParams['dS'] = (2.5e-05, 2.5e-03)
-    randParams['b'] = (1e-04, 1e-02)
-    randParams['u'] = (1e-04, 1e-02)
-    randParams['c'] = (7e-03, 7e-02)
-    randParams['a'] = (0.5, 0.5)
+    randParams['vol'] = 2.0e-12              # cell volume (currently unused)
+    randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
+    randParams['pS'] = (2.4e-03, 2.4e-01)    # transcription of S (kS)
+    randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
+    randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
+    randParams['b'] = (1e-04, 1e-02)         # binding (k+)
+    randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
+    randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
+    randParams['a'] = (0.5, 0.5)             # alpha
 
     maxHalfLife = 700000000
     halfLifeMults = 2
