@@ -21,7 +21,7 @@ and didn't bother with Windows support.  It SHOULD run on any *nix based
 system (e.g., OSX or *BSD), but I've only ever run it on Linux-based 
 systems.
 
-* Endysi uses [BioNetGen](www.bionetgen.org) on the backend.  It expects
+* Endysi uses [BioNetGen](http://www.bionetgen.org) on the backend.  It expects
 the downloaded BioNetGen distribution to be in ~/apps/BioNetGen. No 
 doubt I should change this, but hey, so far I'm the only one using this
 thing.  BioNetGen itself depends on Perl, which should be installed by
