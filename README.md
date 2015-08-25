@@ -56,10 +56,11 @@ have the above dependencies installed.
     
     will create an ensemble of 100 networks consisting of 5 miRNAs and 10 
     ceRNAs in which each miRNA targets 2 ceRNAs and each ceRNA targeted by 
-    2 miRNAs; these networks will then be simulated as systems of ODEs.  
-    The other option for `--method` is 'ssa' (i.e., a Gillespie simulation). 
-    The networks generated are random MNK models.  All kinetic rate constants 
-    are selected at random from physiologically plausible ranges.  
+    2 miRNAs; these networks will then be simulated as systems of ODEs. 
+    The networks generated are random MNK models. All kinetic rate 
+    constants are selected at random from physiologically plausible 
+    ranges. The other option for `--method` is 'ssa' (i.e., a 
+    Gillespie simulation).
 
 3. When it runs, the above command will create a new directory for the 
 raw data and results in ~/research/results/ceRNA/endysi.  This is ongoing
