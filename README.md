@@ -47,15 +47,19 @@ libraries.
 have the above dependencies installed.  
 
 2. cd into the directory above and run:
-`python2 endysi.py --help`
-This will tell you about the command line arguments.  For example:
-`python2 endysi.py -m 5 -n 10 -k 2 -s 100 --method ode`
-will create an ensemble of 100 networks consisting of 5 miRNAs and 10 
-ceRNAs in which each miRNA targets 2 ceRNAs and each ceRNA targeted by 
-2 miRNAs; these networks will then be simulated as systems of ODEs.  
-The other option for `--method` is 'ssa' (i.e., a Gillespie simulation). 
-The networks generated are random MNK models.  All kinetic rate constants 
-are selected at random from physiologically plausible ranges.  
+
+    `python2 endysi.py --help`
+    
+    This will tell you about the command line arguments.  For example:
+    
+    `python2 endysi.py -m 5 -n 10 -k 2 -s 100 --method ode`
+    
+    will create an ensemble of 100 networks consisting of 5 miRNAs and 10 
+    ceRNAs in which each miRNA targets 2 ceRNAs and each ceRNA targeted by 
+    2 miRNAs; these networks will then be simulated as systems of ODEs.  
+    The other option for `--method` is 'ssa' (i.e., a Gillespie simulation). 
+    The networks generated are random MNK models.  All kinetic rate constants 
+    are selected at random from physiologically plausible ranges.  
 
 3. When it runs, the above command will create a new directory for the 
 raw data and results in ~/research/results/ceRNA/endysi.  This is ongoing
