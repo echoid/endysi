@@ -55,6 +55,8 @@ will then be simulated as systems of ODEs.  The other option for
 `--method` is 'ssa' (i.e., a Gillespie simulation).
 
 3. When it runs, the above command will create a new directory for the 
-raw data and results in ~/research/results/ceRNA/endysi.  
+raw data and results in ~/research/results/ceRNA/endysi.  This is ongoing
+and as yet unpublished research, so I'm reluctant to say too much about
+the details.  (Which is to say, please don't scoop me!)
 
 
