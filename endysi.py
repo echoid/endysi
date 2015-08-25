@@ -31,8 +31,6 @@ _seeding = True
 # global setting for alpha ranging
 _rangingAlpha = True
 
-_debugging = False
-
 # colours
 purple = '#673594'
 magenta = '#a0228d'
@@ -508,29 +506,7 @@ class Ensemble:
             self.logger.info('Creating models...')
 
         self.writeRunInfo()
-        if timestamp is not None:
-            self.reinitialize()
-
         return
-
-    def reinitialize(self):
-        for i in range(1, self.size + 1):
-            dDir = join(self.dataDir, 'model%d' % i)
-
-            s = None
-            if _seeding and self.seedScale is not None:
-                s = i * self.seedScale
-
-            model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     self.randParams, alpha=self.alpha, seed=s,
-                                     linearSampling=self.linearSampling,
-                                     reinit=True)
-
-            e = Experiment(self, self.method, model, self.tEnd, self.outFreq,
-                           self.nSamples)
-
-            e.purge()
-            self.experiments.append(e)
 
     def writeRunInfo(self):
         with open(join(self.curRun, 'runInfo'), 'w') as riFile:
@@ -881,37 +857,6 @@ class Population:
             self.logger.info(msg)
         self.writeRunInfo()
 
-        if timestamp is not None:
-            self.reinitialize()
-
-        return
-
-    def reinitialize(self):
-        offset = 0
-        alphas = None
-        if self.rangingAlpha:
-            alphas = np.linspace(0.01, 1, self.p)
-
-        for i in range(self.p):
-            if _logging:
-                self.logger.info('Running simulations on ' + e.name)
-
-            sScale = None
-            if _seeding:
-                sScale = 999 + offset
-                offset += 3
-
-            a = None
-            if self.rangingAlpha:
-                a = alphas[i]
-
-            e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
-                         self.outFreq, 1, self.randParams, baseDir=self.dataDir,
-                         timestamp='e%d' % (i + 1), seedScale=sScale,
-                         linearSampling=self.linearSampling, alpha=a)
-
-            e.purge()
-            self.ensembles.append(e)
         return
 
     def writeRunInfo(self):
@@ -1042,11 +987,6 @@ class Population:
             normR = totR / denom
             normS = totS / denom
 
-            if _debugging:
-                print('denom = %f' % denom)
-                print('normR = %f' % normR)
-                print('normS = %f' % normS)
-
             da['normR'][i] = normR
             da['normS'][i] = normS
             i += 1
@@ -1105,7 +1045,6 @@ class Population:
         return
 
     def runAnalysis(self):
-        print('running pop analysis')
         self.collectCrossConditionCorrelations()
 
         if self.rangingAlpha:
@@ -1163,25 +1102,14 @@ if __name__ == '__main__':
     if socket.gethostname() == 'crick':
         baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
 
-    ts = None
-    if len(args.t) > 0:
-        ts = args.t
-
     if args.p == 1:
         eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
                      args.o, nSamples, randParams, linearSampling=args.linear,
-                     baseDir=baseDir, timestamp=ts)
-        if ts is None:
-            eds.runAll()
-        else:
-            eds.runAnalyses()
+                     baseDir=baseDir)
+        eds.runAll()
     else:
         a = bool(args.alpha)
         p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
                        tEnd, args.o, randParams, linearSampling=args.linear,
-                       baseDir=baseDir, rangingAlpha=a, timestamp=ts)
-
-        if ts is None:
-            p.runAll()
-        else:
-            p.runAnalysis()
+                       baseDir=baseDir, rangingAlpha=a)
+        p.runAll()
