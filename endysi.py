@@ -958,6 +958,7 @@ class Population:
     def alphaAnalysis(self):
         dt = [('alpha', 'f8'), ('normR', 'f8'), ('normS', 'f8'), ('rAvg', 'f8')]
         da = np.zeros(self.p, dtype=dt)
+        dao = np.zeros(self.p, dtype=dt)
 
         i = 0
         for e in self.ensembles:
@@ -974,6 +975,8 @@ class Population:
 
             da['alpha'][i] = alpha
             da['rAvg'][i] = np.mean(ccd['r'])
+            dao['alpha'][i] = alpha
+            dao['rAvg'][i] = np.mean(ccd['r'])
 
             totR = 0
             totS = 0
@@ -983,17 +986,32 @@ class Population:
                 elif 'ceRNA' in name:
                     totR += sum(ssd[name])
 
+            # Individual normalization
             denom = totR + totS
             normR = totR / denom
             normS = totS / denom
-
             da['normR'][i] = normR
             da['normS'][i] = normS
+
+            dao['normR'][i] = totR
+            dao['normS'][i] = totS
             i += 1
 
+        ## Global normalization
+        maxR = max(max(dao['normR']), max(dao['normS']))
+
+        for i in range(self.p):
+            ovs = dao['normS'][i]
+            ovr = dao['normR'][i]
+            dao['normS'][i] = ovs / maxR
+            dao['normR'][i] = ovr / maxR
+
         # write data to file
-        fn = join(self.resultsDir, self.name + '_normSums.csv')
+        fn = join(self.resultsDir, self.name + '_normSums_individual.csv')
         _writeDataToCSV(fn, da)
+
+        fn = join(self.resultsDir, self.name + '_normSums_global.csv')
+        _writeDataToCSV(fn, dao)
 
         # plot normalized RNA levels and R against alpha
         fig = plt.figure()
@@ -1002,7 +1020,17 @@ class Population:
         plt.plot(da['alpha'], da['rAvg'], label='average r')
         plt.xlabel('alpha')
         plt.legend()
-        fn = join(self.resultsDir, self.name + '_normSumsVsAlpha.png')
+        fn = join(self.resultsDir, self.name + '_normSumsVsAlpha_indiv.png')
+        plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
+        plt.close(fig)
+
+        fig = plt.figure()
+        plt.plot(dao['alpha'], dao['normR'], label='normalized ceRNA')
+        plt.plot(dao['alpha'], dao['normS'], label='normalized miRNA')
+        plt.plot(dao['alpha'], dao['rAvg'], label='average r')
+        plt.xlabel('alpha')
+        plt.legend()
+        fn = join(self.resultsDir, self.name + '_normSumsVsAlpha_global.png')
         plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
         plt.close(fig)
 
