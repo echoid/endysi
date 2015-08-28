@@ -65,6 +65,7 @@ class CernetModel:
 
     def writeNetworkFiles(self):
         self.writeBNGL()
+        self.writeNet()
         self.writeSIF()
         self.writeGML()
         self.writeParamFile()
@@ -92,18 +93,21 @@ class CernetModel:
         self.molTypes.extend(self.miRNAs)
 
     def createComplexes_orig(self):
+        count = 1
         for ceRNA in self.ceRNAs:
             partners = random.sample(self.miRNAs, self.k)
             ceRNA.partners.extend(partners)
             for reg in partners:
                 reg.partners.append(ceRNA)
-                self.complexes.append(BnglComplex(ceRNA, reg))
+                self.complexes.append(BnglComplex(ceRNA, reg, count))
+                count += 1
 
     def createComplexes(self):
         if self.m <= 1 or self.k == 0 or self.n == self.k == self.m:
             self.createComplexes_orig()
 
         else:
+            count = 1
             for ceRNA in self.ceRNAs:
                 # get the indices for the miRNAs
                 indices = []
@@ -116,9 +120,10 @@ class CernetModel:
                 # create the connections
                 for i in indices:
                     miRNA = self.getMolWithName('miRNA%d' % i)
-                    self.complexes.append(BnglComplex(ceRNA, miRNA))
+                    self.complexes.append(BnglComplex(ceRNA, miRNA, count))
                     ceRNA.partners.append(miRNA)
                     miRNA.partners.append(ceRNA)
+                    count += 1
 
             self.shuffleNodes()
 
@@ -150,18 +155,21 @@ class CernetModel:
         return True
 
     def createObservables(self):
+        count = 1
         for mol in self.molTypes:
             self.observables.append(
-                BnglObservable('Molecules', '%s_free' % mol.name, mol.bnglCode))
+                BnglObservable('Molecules', '%s_free' % mol.name,
+                                mol.bnglCode, count))
 
     def createRulesAndParams(self, paramDict, volScaling=False, alpha=None,
                              linearSampling=False):
         # Add basic cell params
-        self.params.append(BnglParameter('V', paramDict['vol']))
-        self.params.append(BnglParameter('NA', '6.0221415e+23'))
-        self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
+        #self.params.append(BnglParameter('V', paramDict['vol']))
+        #self.params.append(BnglParameter('NA', '6.0221415e+23'))
+        #self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
 
         count = 0
+        pCount = rCount = 1
         # Production rules
         for mol in self.ceRNAs:
             # Choose param val
@@ -173,12 +181,14 @@ class CernetModel:
                 randVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
             param = 'pR_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
+            self.params.append(BnglParameter(param, randVal, pCount))
             mol.prodRate = randVal
 
             # Create rule
-            self.rules.append(BnglProductionRule(mol, param))
+            self.rules.append(BnglProductionRule(mol, param, rCount))
             count += 1
+            pCount += 1
+            rCount += 1
 
         # confirm correct number of rules made
         assert count == self.n
@@ -194,12 +204,14 @@ class CernetModel:
                 randVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
             param = 'pS_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
+            self.params.append(BnglParameter(param, randVal, pCount))
             mol.prodRate = randVal
 
             # Create rule
-            self.rules.append(BnglProductionRule(mol, param))
+            self.rules.append(BnglProductionRule(mol, param, rCount))
             count += 1
+            pCount += 1
+            rCount += 1
 
         assert count == self.m
 
@@ -215,12 +227,14 @@ class CernetModel:
                 randVal = math.exp(random.uniform(math.log(minVal),
                                                   math.log(maxVal)))
             param = 'dR_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
+            self.params.append(BnglParameter(param, randVal, pCount))
             mol.decayRate = randVal
 
             # Create rule
-            self.rules.append(BnglDecayRule(mol, param))
+            self.rules.append(BnglDecayRule(mol, param, rCount))
             count += 1
+            pCount += 1
+            rCount += 1
 
         assert count == self.n
 
@@ -235,12 +249,14 @@ class CernetModel:
                 randVal = math.exp(random.uniform(math.log(minVal),
                                                   math.log(maxVal)))
             param = 'dS_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
+            self.params.append(BnglParameter(param, randVal, pCount))
             mol.decayRate = randVal
 
             # Create rule
-            self.rules.append(BnglDecayRule(mol, param))
+            self.rules.append(BnglDecayRule(mol, param, rCount))
             count += 1
+            pCount += 1
+            rCount += 1
 
         assert count == self.m
 
@@ -267,17 +283,20 @@ class CernetModel:
             uName = 'u_{0}_{1}'.format(molX.num, molY.num)
 
             if volScaling:
-                self.params.append(BnglParameter(bName, '%s/volScale' % bRand))
+                self.params.append(BnglParameter(bName, '%s/volScale' % bRand,
+                                   pCount))
             else:
-                self.params.append(BnglParameter(bName, bRand))
+                self.params.append(BnglParameter(bName, bRand, pCount))
 
-            self.params.append(BnglParameter(uName, uRand))
+            self.params.append(BnglParameter(uName, uRand, pCount + 1))
             comp.kon = bRand
             comp.koff = uRand
 
             # Create rule
-            self.rules.append(BnglBindingRule(molX, molY, bName, uName))
+            self.rules.append(BnglBindingRule(molX, molY, bName, uName, rCount))
             count += 1
+            pCount += 2
+            rCount += 1
 
         assert count == (self.n * self.k)
 
@@ -313,11 +332,12 @@ class CernetModel:
             cName = 'c_{0}_{1}'.format(molX.num, molY.num)
             cFname = 'cF_{0}_{1}'.format(molX.num, molY.num)
             cPname = 'cP_{0}_{1}'.format(molX.num, molY.num)
-            self.params.append(BnglParameter(aName, aRand))
-            self.params.append(BnglParameter(cName, cRand))
-            self.params.append(BnglParameter(cFname, '%s*%s' % (aName, cName)))
+            self.params.append(BnglParameter(aName, aRand, pCount))
+            self.params.append(BnglParameter(cName, cRand, pCount + 1))
+            self.params.append(BnglParameter(cFname, '%s*%s' % (aName, cName),
+                                             pCount + 2))
             self.params.append(BnglParameter(cPname,
-                               '%s*(1-%s)' % (aName, cName)))
+                               '%s*(1-%s)' % (aName, cName), pCount + 3))
 
             miRNA = None
             if 'miRNA' in molX.name:
@@ -326,11 +346,13 @@ class CernetModel:
                 miRNA = molY
 
             # Full decay
-            self.rules.append(BnglDecayRule(comp, cFname))
+            self.rules.append(BnglDecayRule(comp, cFname, rCount))
             # Partial decay
-            self.rules.append(BnglDecayRule(comp, cPname,
+            self.rules.append(BnglDecayRule(comp, cPname, rCount + 1,
                               remainder=miRNA.bnglCode))
             count += 1
+            pCount += 4
+            rCount += 2
 
         assert count == (self.n * self.k)
 
@@ -476,13 +498,35 @@ class CernetModel:
             self.rules.append(BnglDecayRule(comp, cFname))
             # Partial decay
             self.rules.append(BnglDecayRule(comp, cPname,
-                              remainder=miRNA.bnglCode))
+                              remainder=miRNA))
 
             count += 1
 
         assert count == (self.n * self.k)
 
         return
+
+    def writeNet(self):
+        with open('%s.net' % self.filePath, 'w') as netFile:
+            netFile.write('begin parameters\n')
+            for param in self.params:
+                netFile.write('\t%d %s\n' % (param.id, param.bnglCode))
+            netFile.write('end parameters\n')
+
+            netFile.write('begin species\n')
+            for mol in self.molTypes:
+                netFile.write('\t%d %s 0\n' % (mol.id, mol.bnglCode))
+            netFile.write('end species\n')
+
+            netFile.write('begin reactions\n')
+            for rule in self.rules:
+                netFile.write('\t%d %s\n' % (rule.id, rule.bnglCode))
+            netFile.write('end reactions\n')
+
+            netFile.write('begin groups')
+            for obs in self.observables:
+                netFile.write('\t%d %s\n' % (obs.id, obs.bnglCode))
+            netFile.write('end groups')
 
     def writeBNGL(self):
         with open('%s.bngl' % self.filePath, 'w') as bnglFile:
@@ -612,7 +656,8 @@ class MiRNA(RNA):
 
 
 class BnglComplex:
-    def __init__(self, x, y):
+    def __init__(self, x, y, id_):
+        self.id = id_
         self.molX = x
         self.molY = y
         ts = '{0}({1}!1).{2}({3}!1)'
@@ -633,7 +678,8 @@ class BnglRule:
 
 
 class BnglBindingRule(BnglRule):
-    def __init__(self, x, y, b, u):
+    def __init__(self, x, y, b, u, id_):
+        self.id = id_
         self.molX = x
         self.molY = y
         self.kon = b
@@ -643,29 +689,37 @@ class BnglBindingRule(BnglRule):
 
 
 class BnglProductionRule(BnglRule):
-    def __init__(self, x, k):
+    def __init__(self, x, k, id_):
+        self.id = id_
         self.mol = x
         self.k = k
         self.bnglCode = '0 -> {0} {1}'.format(x.bnglCode, k)
 
 
 class BnglDecayRule(BnglRule):
-    def __init__(self, x, k, remainder='0'):
+    def __init__(self, x, k, id_, remainder='0'):
+        self.id = id_
         self.mol = x
         self.k = k
+        self.remainder = remainder
+        r = '0'
+        if remainder != '0':
+            r = remainder.bnglCode
         ts = '{0} -> {1} {2} DeleteMolecules'
-        self.bnglCode = ts.format(x.bnglCode, remainder, k)
+        self.bnglCode = ts.format(x.bnglCode, r, k)
 
 
 class BnglParameter:
-    def __init__(self, param, val):
+    def __init__(self, param, val, id_):
+        self.id = id_
         self.name = param
         self.val = val
         self.bnglCode = '%s %s' % (param, val)
 
 
 class BnglObservable:
-    def __init__(self, type_, name, pattern):
+    def __init__(self, type_, name, pattern, id_):
+        self.id = id_
         self.type = type_
         self.name = name
         self.pattern = pattern
