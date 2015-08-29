@@ -9,6 +9,7 @@ import math
 import time
 import random
 import logging
+import socket
 from itertools import combinations
 import numpy as np
 import matplotlib.pyplot as plt
@@ -1081,9 +1082,49 @@ class Population:
         return
 
 
+def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
+                    rangeAlpha=False):
+
+    randParams = {}
+    randParams['vol'] = 2.0e-12              # cell volume (currently unused)
+    randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
+    randParams['pS'] = (2.4e-03, 2.4e-01)    # transcription of S (kS)
+    randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
+    randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
+    randParams['b'] = (1e-04, 1e-02)         # binding (k+)
+    randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
+    randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
+    randParams['a'] = (0.5, 0.5)             # alpha
+
+    maxHalfLife = 700000000
+    halfLifeMults = 2
+    nSamples = 1
+
+    if method == 'ssa':
+        nSamples = 100
+
+    tEnd = maxHalfLife * halfLifeMults * nSamples
+
+    # Check if we're running on the lab cluster
+    baseDir = None
+    if socket.gethostname() == 'crick':
+        baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
+
+    if p == 1:
+        eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples, randParams,
+                       linearSampling=linSamp, baseDir=baseDir)
+        eds.runAll()
+    else:
+        p = Population(p, m, n, k, s, method, tEnd, outFreq, randParams,
+                       linearSampling=linSamp, baseDir=baseDir,
+                       rangingAlpha=rangeAlpha)
+        p.runAll()
+
+    return
+
+
 if __name__ == '__main__':
     import argparse
-    import socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', type=int, default=1,
                         help='The size of the population of ensembles')
@@ -1105,39 +1146,42 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    randParams = {}
-    randParams['vol'] = 2.0e-12              # cell volume (currently unused)
-    randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
-    randParams['pS'] = (2.4e-03, 2.4e-01)    # transcription of S (kS)
-    randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
-    randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
-    randParams['b'] = (1e-04, 1e-02)         # binding (k+)
-    randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
-    randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
-    randParams['a'] = (0.5, 0.5)             # alpha
+    makeRocketGoNow(args.m, args.n, args.k, args.s, args.p, args.o,
+                    args.method, linSamp=args.linear, rangeAlpha=args.alpha)
 
-    maxHalfLife = 700000000
-    halfLifeMults = 2
-    nSamples = 1
+    #randParams = {}
+    #randParams['vol'] = 2.0e-12              # cell volume (currently unused)
+    #randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
+    #randParams['pS'] = (2.4e-03, 2.4e-01)    # transcription of S (kS)
+    #randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
+    #randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
+    #randParams['b'] = (1e-04, 1e-02)         # binding (k+)
+    #randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
+    #randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
+    #randParams['a'] = (0.5, 0.5)             # alpha
 
-    if args.method == 'ssa':
-        nSamples = 100
+    #maxHalfLife = 700000000
+    #halfLifeMults = 2
+    #nSamples = 1
 
-    tEnd = maxHalfLife * halfLifeMults * nSamples
+    #if args.method == 'ssa':
+        #nSamples = 100
 
-    # Check if we're running on the lab cluster
-    baseDir = None
-    if socket.gethostname() == 'crick':
-        baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
+    #tEnd = maxHalfLife * halfLifeMults * nSamples
 
-    if args.p == 1:
-        eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
-                     args.o, nSamples, randParams, linearSampling=args.linear,
-                     baseDir=baseDir)
-        eds.runAll()
-    else:
-        a = bool(args.alpha)
-        p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
-                       tEnd, args.o, randParams, linearSampling=args.linear,
-                       baseDir=baseDir, rangingAlpha=a)
-        p.runAll()
+    ## Check if we're running on the lab cluster
+    #baseDir = None
+    #if socket.gethostname() == 'crick':
+        #baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
+
+    #if args.p == 1:
+        #eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
+                     #args.o, nSamples, randParams, linearSampling=args.linear,
+                     #baseDir=baseDir)
+        #eds.runAll()
+    #else:
+        #a = bool(args.alpha)
+        #p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
+                       #tEnd, args.o, randParams, linearSampling=args.linear,
+                       #baseDir=baseDir, rangingAlpha=a)
+        #p.runAll()
