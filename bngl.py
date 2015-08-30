@@ -22,6 +22,7 @@ class CernetModel:
 
         if seed is not None:
             random.seed(seed)
+        self.seed = seed
 
         self.home = home
         self.plotDir = join(home, 'plots')
@@ -46,8 +47,9 @@ class CernetModel:
         self.observables = []
         self.rules = []
 
-        self.createMolTypes()
-        self.createComplexes()
+        count = 1
+        count = self.createMolTypes(count)
+        count = self.createComplexes(count)
         self.createObservables()
         self.createRulesAndParams(paramDict, linearSampling=linearSampling,
                                   alpha=alpha)
@@ -80,8 +82,7 @@ class CernetModel:
         self.debugger.warning(msg)
         return None
 
-    def createMolTypes(self):
-        count = 1
+    def createMolTypes(self, count):
         for i in range(1, self.n + 1):
             self.ceRNAs.append(CeRNA(i, count))
             count += 1
@@ -92,8 +93,9 @@ class CernetModel:
         self.molTypes = list(self.ceRNAs)
         self.molTypes.extend(self.miRNAs)
 
-    def createComplexes_orig(self):
-        count = 1
+        return count
+
+    def createComplexes_orig(self, count):
         for ceRNA in self.ceRNAs:
             partners = random.sample(self.miRNAs, self.k)
             ceRNA.partners.extend(partners)
@@ -102,12 +104,13 @@ class CernetModel:
                 self.complexes.append(BnglComplex(ceRNA, reg, count))
                 count += 1
 
-    def createComplexes(self):
+        return count
+
+    def createComplexes(self, count):
         if self.m <= 1 or self.k == 0 or self.n == self.k == self.m:
-            self.createComplexes_orig()
+            self.createComplexes_orig(count)
 
         else:
-            count = 1
             for ceRNA in self.ceRNAs:
                 # get the indices for the miRNAs
                 indices = []
@@ -126,6 +129,8 @@ class CernetModel:
                     count += 1
 
             self.shuffleNodes()
+
+            return count
 
     def shuffleNodes(self):
         for i in range(_nFlips):
@@ -159,7 +164,8 @@ class CernetModel:
         for mol in self.molTypes:
             self.observables.append(
                 BnglObservable('Molecules', '%s_free' % mol.name,
-                                mol.bnglCode, count))
+                                mol, count))
+            count += 1
 
     def createRulesAndParams(self, paramDict, volScaling=False, alpha=None,
                              linearSampling=False):
@@ -293,10 +299,10 @@ class CernetModel:
             comp.koff = uRand
 
             # Create rule
-            self.rules.append(BnglBindingRule(molX, molY, bName, uName, rCount))
+            self.rules.append(BnglBindingRule(comp, bName, uName, rCount))
             count += 1
             pCount += 2
-            rCount += 1
+            rCount += 2
 
         assert count == (self.n * self.k)
 
@@ -349,7 +355,7 @@ class CernetModel:
             self.rules.append(BnglDecayRule(comp, cFname, rCount))
             # Partial decay
             self.rules.append(BnglDecayRule(comp, cPname, rCount + 1,
-                              remainder=miRNA.bnglCode))
+                              remainder=miRNA))
             count += 1
             pCount += 4
             rCount += 2
@@ -510,22 +516,24 @@ class CernetModel:
         with open('%s.net' % self.filePath, 'w') as netFile:
             netFile.write('begin parameters\n')
             for param in self.params:
-                netFile.write('\t%d %s\n' % (param.id, param.bnglCode))
+                netFile.write('\t%s\n' % param.netCode)
             netFile.write('end parameters\n')
 
             netFile.write('begin species\n')
             for mol in self.molTypes:
                 netFile.write('\t%d %s 0\n' % (mol.id, mol.bnglCode))
+            for comp in self.complexes:
+                netFile.write('\t%d %s 0\n' % (comp.id, comp.bnglCode))
             netFile.write('end species\n')
 
             netFile.write('begin reactions\n')
             for rule in self.rules:
-                netFile.write('\t%d %s\n' % (rule.id, rule.bnglCode))
+                netFile.write('\t%d %s\n' % (rule.id, rule.netCode))
             netFile.write('end reactions\n')
 
-            netFile.write('begin groups')
+            netFile.write('begin groups\n')
             for obs in self.observables:
-                netFile.write('\t%d %s\n' % (obs.id, obs.bnglCode))
+                netFile.write('\t%s\n' % obs.netCode)
             netFile.write('end groups')
 
     def writeBNGL(self):
@@ -638,6 +646,7 @@ class CeRNA(RNA):
         self.name = 'ceRNA%d' % num
         self.comps = 'm'
         self.bnglCode = '%s(%s)' % (self.name, self.comps)
+        self.netCode = str(self.id)
         self.partners = []
         self.prodRate = 0.0
         self.decayRate = 0.0
@@ -650,6 +659,7 @@ class MiRNA(RNA):
         self.name = 'miRNA%d' % num
         self.comps = 'c'
         self.bnglCode = '%s(%s)' % (self.name, self.comps)
+        self.netCode = str(self.id)
         self.partners = []
         self.prodRate = 0.0
         self.decayRate = 0.0
@@ -662,6 +672,7 @@ class BnglComplex:
         self.molY = y
         ts = '{0}({1}!1).{2}({3}!1)'
         self.bnglCode = ts.format(x.name, x.comps, y.name, y.comps)
+        self.netCode = str(self.id)
         self.kon = 0.0
         self.koff = 0.0
         self.decayRate = 0.0
@@ -674,18 +685,27 @@ class BnglComplex:
 
 class BnglRule:
     def __init__(self):
+        self.reactants = []
+        self.products = []
         pass
+
+    def hasReactant(self, x):
+        return x in self.reactants
+
+    def hasProduct(self, x):
+        return x in self.products
 
 
 class BnglBindingRule(BnglRule):
-    def __init__(self, x, y, b, u, id_):
+    def __init__(self, comp, b, u, id_):
         self.id = id_
-        self.molX = x
-        self.molY = y
-        self.kon = b
-        self.koff = u
+        x = comp.molX
+        y = comp.molY
+        self.comp = comp
         ts = '{0}({1}) + {2}({3}) <-> {0}({1}!1).{2}({3}!1) {4}, {5}'
         self.bnglCode = ts.format(x.name, x.comps, y.name, y.comps, b, u)
+        ts = '{0},{1} {2} {3}\n\t{5} {2} {0},{1} {4}'
+        self.netCode = ts.format(x.id, y.id, comp.id, b, u, id_ + 1)
 
 
 class BnglProductionRule(BnglRule):
@@ -694,6 +714,7 @@ class BnglProductionRule(BnglRule):
         self.mol = x
         self.k = k
         self.bnglCode = '0 -> {0} {1}'.format(x.bnglCode, k)
+        self.netCode = '0 {0} {1}'.format(x.netCode, k)
 
 
 class BnglDecayRule(BnglRule):
@@ -702,11 +723,13 @@ class BnglDecayRule(BnglRule):
         self.mol = x
         self.k = k
         self.remainder = remainder
-        r = '0'
+        r = rn = '0'
         if remainder != '0':
             r = remainder.bnglCode
+            rn = remainder.netCode
         ts = '{0} -> {1} {2} DeleteMolecules'
         self.bnglCode = ts.format(x.bnglCode, r, k)
+        self.netCode = '{0} {1} {2}'.format(x.netCode, rn, k)
 
 
 class BnglParameter:
@@ -715,15 +738,17 @@ class BnglParameter:
         self.name = param
         self.val = val
         self.bnglCode = '%s %s' % (param, val)
+        self.netCode = '{0} {1} {2}'.format(id_, param, val)
 
 
 class BnglObservable:
-    def __init__(self, type_, name, pattern, id_):
+    def __init__(self, type_, name, mol, id_):
         self.id = id_
         self.type = type_
         self.name = name
-        self.pattern = pattern
-        self.bnglCode = '{0} {1} {2}'.format(type_, name, pattern)
+        self.mol = mol
+        self.bnglCode = '{0} {1} {2}'.format(type_, name, mol.bnglCode)
+        self.netCode = '{0} {1} {2}'.format(id_, mol.name, mol.netCode)
 
 
 class BnglSimulator:

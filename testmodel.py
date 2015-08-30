@@ -13,4 +13,4 @@ randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
 randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
 randParams['a'] = (0.5, 0.5)             # alpha
 
-m = bngl.CernetModel('/home/matt/testmodel', 1, 2, 1, 1, randParams)
+m = bngl.CernetModel('/home/matt/testmodel', 1, 2, 1, 1, randParams, seed=1)

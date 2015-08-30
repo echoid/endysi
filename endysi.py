@@ -8,8 +8,10 @@ import os
 import math
 import time
 import random
+import socket
 import logging
 from itertools import combinations
+import pexpect
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
@@ -154,7 +156,7 @@ class Experiment:
                  pTarget='ceRNA', pProp=5.0):
 
         self.model = model
-        self.simulator = bngl.BnglSimulator(model)
+        #self.simulator = bngl.BnglSimulator(model)
         self.perturbTarget = pTarget
         self.perturbProp = pProp
         self.method = method
@@ -162,24 +164,38 @@ class Experiment:
         self.nSamples = nSamples
         self.parent = parent
 
-        self.action = 'simulate({method=>"%(meth)s",suffix=>"%(suf)s",' + \
-                      'continue=>%(cnt)d,steady_state=>%(ss)d,' + \
-                      't_end=>%(tend)d,n_steps=>%(nsteps)d,' + \
-                      'print_CDAT=>%(pcdat)d})'
+        #self.action = 'simulate({method=>"%(meth)s",suffix=>"%(suf)s",' + \
+                      #'continue=>%(cnt)d,steady_state=>%(ss)d,' + \
+                      #'t_end=>%(tend)d,n_steps=>%(nsteps)d,' + \
+                      #'print_CDAT=>%(pcdat)d})'
 
-        nsteps = int(tEnd / outFreq)
-        self.opts = {'suf': 'sim', 'tend': tEnd, 'nsteps': nsteps, 'cnt': 0,
-                     'meth': method, 'pcdat': 0, 'ss': 0}
+        if method == 'ode':
+            self.action = 'run_network -o ./%(name)s_%(suf)s -p cvode ' + \
+                           '-a 1e-08 -r 1e-08 -c --cdat %(pcdat)d --fdat 0 ' + \
+                           '-g ./%(name)s.net ./%(name)s.net %(outFreq)d ' + \
+                           '%(tend)d'
+        elif method == 'ssa':
+            self.action = 'run_network -o ./%(name)s_%(suf)s -p ssa -h ' + \
+                           '%(seed)d --cdat %(pcdat)d --fdat 0 -g ' + \
+                           './%(name)s.net ./%(name)s.net ' + \
+                           '%(outFreq)d %(tend)d'
+
+        #nsteps = int(tEnd / outFreq)
+        self.opts = {'suf': 'equil', 'tend': tEnd, 'outFreq': outFreq, 'cnt': 0,
+                     'meth': method, 'pcdat': 0, 'ss': 0, 'name': model.name,
+                     'seed': self.model.seed}
 
         if method == 'ode':
             self.opts['ss'] = 1
-            tend = 100000000000
-            self.opts['tend'] = tend
-            self.opts['nsteps'] = int(tend / outFreq)
+            self.opts['tend'] = 100000000000
+
+        # fix tEnd business
+        self.opts['tend'] = int(self.opts['tend'] / outFreq)
+
         return
 
     def purge(self):
-        del self.simulator
+        #del self.simulator
         del self.action
         del self.perturbProp
         del self.perturbTarget
@@ -189,15 +205,23 @@ class Experiment:
     def run(self):
         # Initialize simulator
         os.chdir(self.model.home)
-        self.simulator.initialize()
+        #self.simulator.initialize()
 
         # Equilibration phase
         self.opts['suf'] = 'equil'
-        self.simulator.sendAction(self.action % self.opts)
-        self.simulator.saveConcentrations()
+        a = self.action % self.opts
+        #print(a)
+        fn = self.model.filePath + '_sim_log.log'
+        os.system(a + ' > ' + fn)
+        #simlog = open(fn, 'w')
+        #tout = 1000000
+        #pexpect.run(a, logfile=simlog, timeout=tout)
+        #simlog.close()
+        #self.simulator.sendAction(self.action % self.opts)
+        #self.simulator.saveConcentrations()
 
-        self.simulator.done()
-        self.simulator.close()
+        #self.simulator.done()
+        #self.simulator.close()
 
         return
 
