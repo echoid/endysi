@@ -11,11 +11,11 @@ import random
 import socket
 import logging
 from itertools import combinations
-#import pexpect
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 import bngl
+import parameters as params
 from utilities import *
 
 # Global debugging level
@@ -892,6 +892,7 @@ class Population:
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
             riFile.write('rangingAlpha: ' + str(self.rangingAlpha) + '\n')
+            riFile.write('Parameter ranges: %s\n' % self.randParams.name)
         return
 
     def createDirectories(self, baseDir):
@@ -965,9 +966,10 @@ class Population:
                 a = alphas[i]
 
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
-                         self.outFreq, 1, self.randParams, baseDir=self.dataDir,
-                         timestamp='e%d' % (i + 1), seedScale=sScale,
-                         linearSampling=self.linearSampling, alpha=a)
+                         self.outFreq, 1, self.randParams.params,
+                         baseDir=self.dataDir, timestamp='e%d' % (i + 1),
+                         seedScale=sScale, linearSampling=self.linearSampling,
+                         alpha=a)
             e.runAll()
             e.purge()
             self.ensembles.append(e)
@@ -1108,16 +1110,7 @@ class Population:
 def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
                     rangeAlpha=False):
 
-    randParams = {}
-    randParams['vol'] = 2.0e-12              # cell volume (currently unused)
-    randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
-    randParams['pS'] = (2.4e-04, 2.4e-02)    # transcription of S (kS)
-    randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
-    randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
-    randParams['b'] = (1e-04, 1e-02)         # binding (k+)
-    randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
-    randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
-    randParams['a'] = (0.5, 0.5)             # alpha
+    randParams = params.NitzanParametersReduced()
 
     maxHalfLife = 700000000
     halfLifeMults = 2
@@ -1134,8 +1127,9 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
         baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
 
     if p == 1:
-        eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples, randParams,
-                       linearSampling=linSamp, baseDir=baseDir)
+        eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples,
+                       randParams.params, linearSampling=linSamp,
+                       baseDir=baseDir)
         eds.runAll()
     else:
         p = Population(p, m, n, k, s, method, tEnd, outFreq, randParams,
