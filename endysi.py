@@ -8,13 +8,14 @@ import os
 import math
 import time
 import random
-import logging
 import socket
+import logging
 from itertools import combinations
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 import bngl
+import parameters as params
 from utilities import *
 
 # Global debugging level
@@ -155,7 +156,7 @@ class Experiment:
                  pTarget='ceRNA', pProp=5.0):
 
         self.model = model
-        self.simulator = bngl.BnglSimulator(model)
+        #self.simulator = bngl.BnglSimulator(model)
         self.perturbTarget = pTarget
         self.perturbProp = pProp
         self.method = method
@@ -163,24 +164,38 @@ class Experiment:
         self.nSamples = nSamples
         self.parent = parent
 
-        self.action = 'simulate({method=>"%(meth)s",suffix=>"%(suf)s",' + \
-                      'continue=>%(cnt)d,steady_state=>%(ss)d,' + \
-                      't_end=>%(tend)d,n_steps=>%(nsteps)d,' + \
-                      'print_CDAT=>%(pcdat)d})'
+        #self.action = 'simulate({method=>"%(meth)s",suffix=>"%(suf)s",' + \
+                      #'continue=>%(cnt)d,steady_state=>%(ss)d,' + \
+                      #'t_end=>%(tend)d,n_steps=>%(nsteps)d,' + \
+                      #'print_CDAT=>%(pcdat)d})'
 
-        nsteps = int(tEnd / outFreq)
-        self.opts = {'suf': 'sim', 'tend': tEnd, 'nsteps': nsteps, 'cnt': 0,
-                     'meth': method, 'pcdat': 0, 'ss': 0}
+        if method == 'ode':
+            self.action = 'run_network -o ./%(name)s_%(suf)s -p cvode ' + \
+                           '-a 1e-08 -r 1e-08 -c --cdat %(pcdat)d --fdat 0 ' + \
+                           '-g ./%(name)s.net ./%(name)s.net %(outFreq)d ' + \
+                           '%(tend)d'
+        elif method == 'ssa':
+            self.action = 'run_network -o ./%(name)s_%(suf)s -p ssa -h ' + \
+                           '%(seed)d --cdat %(pcdat)d --fdat 0 -g ' + \
+                           './%(name)s.net ./%(name)s.net ' + \
+                           '%(outFreq)d %(tend)d'
+
+        #nsteps = int(tEnd / outFreq)
+        self.opts = {'suf': 'equil', 'tend': tEnd, 'outFreq': outFreq, 'cnt': 0,
+                     'meth': method, 'pcdat': 0, 'ss': 0, 'name': model.name,
+                     'seed': self.model.seed}
 
         if method == 'ode':
             self.opts['ss'] = 1
-            tend = 100000000000
-            self.opts['tend'] = tend
-            self.opts['nsteps'] = int(tend / outFreq)
+            self.opts['tend'] = 100000000000
+
+        # fix tEnd business
+        self.opts['tend'] = int(self.opts['tend'] / outFreq)
+
         return
 
     def purge(self):
-        del self.simulator
+        #del self.simulator
         del self.action
         del self.perturbProp
         del self.perturbTarget
@@ -190,15 +205,23 @@ class Experiment:
     def run(self):
         # Initialize simulator
         os.chdir(self.model.home)
-        self.simulator.initialize()
+        #self.simulator.initialize()
 
         # Equilibration phase
         self.opts['suf'] = 'equil'
-        self.simulator.sendAction(self.action % self.opts)
-        self.simulator.saveConcentrations()
+        a = self.action % self.opts
+        #print(a)
+        fn = self.model.filePath + '_sim_log.log'
+        os.system(a + ' > ' + fn)
+        #simlog = open(fn, 'w')
+        #tout = 1000000
+        #pexpect.run(a, logfile=simlog, timeout=tout)
+        #simlog.close()
+        #self.simulator.sendAction(self.action % self.opts)
+        #self.simulator.saveConcentrations()
 
-        self.simulator.done()
-        self.simulator.close()
+        #self.simulator.done()
+        #self.simulator.close()
 
         return
 
@@ -869,6 +892,7 @@ class Population:
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
             riFile.write('rangingAlpha: ' + str(self.rangingAlpha) + '\n')
+            riFile.write('Parameter ranges: %s\n' % self.randParams.name)
         return
 
     def createDirectories(self, baseDir):
@@ -942,9 +966,10 @@ class Population:
                 a = alphas[i]
 
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
-                         self.outFreq, 1, self.randParams, baseDir=self.dataDir,
-                         timestamp='e%d' % (i + 1), seedScale=sScale,
-                         linearSampling=self.linearSampling, alpha=a)
+                         self.outFreq, 1, self.randParams.params,
+                         baseDir=self.dataDir, timestamp='e%d' % (i + 1),
+                         seedScale=sScale, linearSampling=self.linearSampling,
+                         alpha=a)
             e.runAll()
             e.purge()
             self.ensembles.append(e)
@@ -1085,16 +1110,7 @@ class Population:
 def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
                     rangeAlpha=False):
 
-    randParams = {}
-    randParams['vol'] = 2.0e-12              # cell volume (currently unused)
-    randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
-    randParams['pS'] = (2.4e-03, 2.4e-01)    # transcription of S (kS)
-    randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
-    randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
-    randParams['b'] = (1e-04, 1e-02)         # binding (k+)
-    randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
-    randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
-    randParams['a'] = (0.5, 0.5)             # alpha
+    randParams = params.NitzanParametersReduced()
 
     maxHalfLife = 700000000
     halfLifeMults = 2
@@ -1111,8 +1127,9 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
         baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
 
     if p == 1:
-        eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples, randParams,
-                       linearSampling=linSamp, baseDir=baseDir)
+        eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples,
+                       randParams.params, linearSampling=linSamp,
+                       baseDir=baseDir)
         eds.runAll()
     else:
         p = Population(p, m, n, k, s, method, tEnd, outFreq, randParams,
@@ -1148,40 +1165,3 @@ if __name__ == '__main__':
 
     makeRocketGoNow(args.m, args.n, args.k, args.s, args.p, args.o,
                     args.method, linSamp=args.linear, rangeAlpha=args.alpha)
-
-    #randParams = {}
-    #randParams['vol'] = 2.0e-12              # cell volume (currently unused)
-    #randParams['pR'] = (2.4e-03, 2.4e-01)    # transcription of R (kR)
-    #randParams['pS'] = (2.4e-03, 2.4e-01)    # transcription of S (kS)
-    #randParams['dR'] = (1e-05, 1e-03)        # decay of R (gR)
-    #randParams['dS'] = (2.5e-05, 2.5e-03)    # decay of S (gS)
-    #randParams['b'] = (1e-04, 1e-02)         # binding (k+)
-    #randParams['u'] = (1e-04, 1e-02)         # unbinding (k-)
-    #randParams['c'] = (7e-03, 7e-02)         # decay of complex (g)
-    #randParams['a'] = (0.5, 0.5)             # alpha
-
-    #maxHalfLife = 700000000
-    #halfLifeMults = 2
-    #nSamples = 1
-
-    #if args.method == 'ssa':
-        #nSamples = 100
-
-    #tEnd = maxHalfLife * halfLifeMults * nSamples
-
-    ## Check if we're running on the lab cluster
-    #baseDir = None
-    #if socket.gethostname() == 'crick':
-        #baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
-
-    #if args.p == 1:
-        #eds = Ensemble(args.m, args.n, args.k, args.s, args.method, tEnd,
-                     #args.o, nSamples, randParams, linearSampling=args.linear,
-                     #baseDir=baseDir)
-        #eds.runAll()
-    #else:
-        #a = bool(args.alpha)
-        #p = Population(args.p, args.m, args.n, args.k, args.s, args.method,
-                       #tEnd, args.o, randParams, linearSampling=args.linear,
-                       #baseDir=baseDir, rangingAlpha=a)
-        #p.runAll()
