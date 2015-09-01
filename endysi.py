@@ -539,6 +539,7 @@ class Ensemble:
             riFile.write('n = %d\n' % self.n)
             riFile.write('k = %d\n' % self.k)
             riFile.write('method: %s\n' % self.method)
+            riFile.write('Parameters: %s\n' % self.randParams.name)
 
         with open(join(self.curRun, 'alpha'), 'w') as aFile:
             aFile.write('alpha=' + str(self.alpha))
@@ -827,8 +828,8 @@ class Ensemble:
                 s = i * self.seedScale
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     self.randParams, alpha=self.alpha, seed=s,
-                                     linearSampling=self.linearSampling)
+                                     self.randParams.params, alpha=self.alpha,
+                                     seed=s, linearSampling=self.linearSampling)
 
             e = Experiment(self, self.method, model, self.tEnd, self.outFreq,
                            self.nSamples)
@@ -966,7 +967,7 @@ class Population:
                 a = alphas[i]
 
             e = Ensemble(self.m, self.n, self.k, self.s, self.method, self.tEnd,
-                         self.outFreq, 1, self.randParams.params,
+                         self.outFreq, 1, self.randParams,
                          baseDir=self.dataDir, timestamp='e%d' % (i + 1),
                          seedScale=sScale, linearSampling=self.linearSampling,
                          alpha=a)
@@ -1128,7 +1129,7 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
 
     if p == 1:
         eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples,
-                       randParams.params, linearSampling=linSamp,
+                       randParams, linearSampling=linSamp,
                        baseDir=baseDir)
         eds.runAll()
     else:
