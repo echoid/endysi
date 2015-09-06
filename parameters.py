@@ -50,3 +50,20 @@ class NitzanParametersReduced(NitzanParameters):
         super(NitzanParametersReduced, self).__init__()
         self.set('pS', (2.4e-04, 2.4e-02))
         self.name = 'NitzanParametersReduced'
+
+
+class NitzanParametersExpanded(NitzanParameters):
+    """This class represents an expanded parameter range based on Nitzan et al.,
+    2014.
+
+    The original ranges have been expanded by two orders of magnitude, extending
+    it in both directions (min and max)
+    """
+
+    def __init__(self):
+        super(NitzanParametersExpanded, self).__init__()
+        self.params = {'pR': (2.4e-04, 2.4), 'pS': (2.4e-04, 2.4),
+                       'dR': (1e-06, 1e-02), 'dS': (2.5e-06, 2.5e-02),
+                       'b': (1e-05, 1e-01), 'u': (1e-05, 1e-01),
+                       'c': (7e-04, 7e-01), 'a': (0.5, 0.5)}
+        self.name = 'NitzanParametersExpanded'
