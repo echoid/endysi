@@ -1156,7 +1156,7 @@ if __name__ == '__main__':
     parser.add_argument('--linear', type=int, default=0,
                         help='Whether to sample over linear or log space' +
                         'Default is log sampling, which works better')
-    parser.add_argument('--alpha', type=int, default=0,
+    parser.add_argument('--alpha', type=int, default=1,
                         help='Range alpha parameter; default off (0)')
     parser.add_argument('-o', type=int, default=2000, help='Output frequency')
     parser.add_argument('-t', type=str, default='',
