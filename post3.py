@@ -106,5 +106,6 @@ if __name__ == '__main__':
 
     if args.root == 'None':
         doit(args.m, args.n, args.k, args.s, args.p, args.time)
-    else:
-        doit(args.m, args.n, args.k, args.s, args.p, args.time, rootDir=args.root)
+    elif args.root == 'ohri':
+        r = '/ohri/projects/perkins/mattm/ceRNA/endysi'
+        doit(args.m, args.n, args.k, args.s, args.p, args.time, rootDir=r)
