@@ -52,6 +52,14 @@ class NitzanParametersReduced(NitzanParameters):
         self.name = 'NitzanParametersReduced'
 
 
+class NitzanParametersCustom(NitzanParametersReduced):
+
+    def __init__(self, sMin, sMax):
+        super(NitzanParametersCustom, self).__init__()
+        self.set('pS', (sMin, sMax))
+        self.name = 'NitzanParametersCustom_%f--%f' % (sMin, sMax)
+
+
 class NitzanParametersExpanded(NitzanParameters):
     """This class represents an expanded parameter range based on Nitzan et al.,
     2014.

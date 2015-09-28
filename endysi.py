@@ -1108,10 +1108,8 @@ class Population:
         return
 
 
-def makeRocketGoNow(m, n, k, s, p, outFreq, method, linSamp=False,
+def makeRocketGoNow(m, n, k, s, p, outFreq, method, randParams, linSamp=False,
                     rangeAlpha=False):
-
-    randParams = params.NitzanParametersReduced()
 
     maxHalfLife = 700000000
     halfLifeMults = 2
@@ -1156,7 +1154,7 @@ if __name__ == '__main__':
     parser.add_argument('--linear', type=int, default=0,
                         help='Whether to sample over linear or log space' +
                         'Default is log sampling, which works better')
-    parser.add_argument('--alpha', type=int, default=1,
+    parser.add_argument('--alpha', type=int, default=0,
                         help='Range alpha parameter; default off (0)')
     parser.add_argument('-o', type=int, default=2000, help='Output frequency')
     parser.add_argument('-t', type=str, default='',
@@ -1164,5 +1162,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    randParams = params.NitzanParametersReduced()
     makeRocketGoNow(args.m, args.n, args.k, args.s, args.p, args.o,
-                    args.method, linSamp=args.linear, rangeAlpha=args.alpha)
+                    args.method, randParams, linSamp=args.linear,
+                    rangeAlpha=args.alpha)
