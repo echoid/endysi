@@ -99,10 +99,23 @@ class NitzanParametersExpanded(NitzanParameters):
         self.name = 'NitzanParametersExpanded'
 
 
-class Figure1Parameters(ParameterRange):
+class FixedParameterRange(ParameterRange):
+
+    def __init__(self, name, pRanged, pMin, pMax):
+        super(FixedParameterRange, self).__init__(name, fixed=True)
+
+        self.pRanged = pRanged
+        self.pMin = pMin
+        self.pMax = pMax
+        self.name += '_%s_%f-%f' % (pRanged, pMin, pMax)
+
+
+class Figure1Parameters(FixedParameterRange):
 
     def __init__(self):
-        super(Figure1Parameters, self).__init__("Figure1Parameters", fixed=True)
+        super(Figure1Parameters, self).__init__("Figure1Parameters", 'pS',
+                                                2.4e-04, 2.4e-02)
+
         self.params = {'pR': (2.4e-03,), 'pS': (2.4e-02,),
                        'dR': (1e-04,), 'dS': (2.5e-04,),
                        'b': (1e-03,), 'u': (1e-03,),
@@ -110,4 +123,3 @@ class Figure1Parameters(ParameterRange):
 
     def set(self, param, val):
         self.params[param] = val
-        self.name += '_%s--%f' % (param, val)
