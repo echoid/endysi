@@ -75,3 +75,17 @@ class NitzanParametersExpanded(NitzanParameters):
                        'b': (1e-05, 1e-01), 'u': (1e-05, 1e-01),
                        'c': (7e-04, 7e-01), 'a': (0.5, 0.5)}
         self.name = 'NitzanParametersExpanded'
+
+
+class Figure1Parameters(ParameterRange):
+
+    def __init__(self):
+        super(Figure1Parameters, self).__init__("Figure1Parameters")
+        self.params = {'pR': (2.4e-03, 2.4e-03), 'pS': (2.4e-02, 2.4e-02),
+                       'dR': (1e-04, 1e-04), 'dS': (2.5e-04, 2.5e-04),
+                       'b': (1e-03, 1e-03), 'u': (1e-03, 1e-03),
+                       'c': (0.035, 0.035), 'a': (0.5, 0.5)}
+
+    def set(self, param, val):
+        self.params[param] = val
+        self.name += '_%s--%f' % (param, val)

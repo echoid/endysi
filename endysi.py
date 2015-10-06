@@ -818,14 +818,24 @@ class Ensemble:
             self.calcAutocorrelations()
         return
 
-    def runAll(self):
+    def runAll(self, param=None, pMin=None, pMax=None):
+        paramRange = None
+        if param is not None:
+            paramRange = np.logspace(np.log10(pMin), np.log10(pMax),
+                                     num=self.size)
+
         tStart = time.time()
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
 
             s = None
-            if _seeding and self.seedScale is not None:
-                s = i * self.seedScale
+            if _seeding:
+                s = i
+                if self.seedScale is not None:
+                    s *= self.seedScale
+
+            if param is not None:
+                self.randParams.set(param, paramRange[i - 1])
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      self.randParams.params, alpha=self.alpha,
@@ -1111,7 +1121,7 @@ class Population:
 def makeRocketGoNow(m, n, k, s, p, outFreq, method, randParams, linSamp=False,
                     rangeAlpha=False):
 
-    maxHalfLife = 700000000
+    maxHalfLife = 70000
     halfLifeMults = 2
     nSamples = 1
 
