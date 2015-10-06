@@ -381,6 +381,30 @@ class Experiment:
     def gatherParams(self):
         pass
 
+    def makeStochScatterPlots(self):
+        if self.parent.n > 2:
+            return
+
+        sampFreq = int(140000 / self.outFreq)
+        samplePoints = list(range(sampFreq, self.nSamples * sampFreq, sampFreq))
+
+        dt = [('ceRNA1', 'f8'), ('ceRNA2', 'f8')]
+        molData = np.zeros(len(samplePoints), dtype=dt)
+
+        # grab data at the sample frequency
+        for i in samplePoints:
+            molData['ceRNA1'][i] = self.equilData['ceRNA1_free'][i]
+            molData['ceRNA2'][i] = self.equilData['ceRNA2_free'][i]
+
+        # Write results to files
+        fn = self.model.filePath + '_ceRNA_samples.csv'
+        _writeDataToCSV(fn, molData, frmt=('%.18e', '%.18e'))
+
+        t = 'ceRNA1 vs. ceRNA2'
+        fn = join(self.model.plotDir, self.model.name + '_ceRNA_scatter.png')
+        _scatterPlot(fn, molData['ceRNA1'], molData['ceRNA2'], False,
+                     'ceRNA1', 'ceRNA2', title=t)
+
     def makeScatterPlots(self):
         # gather params
         dt = [('steady state', 'f8'), ('trans', 'f8'), ('decay', 'f8'),
@@ -479,6 +503,7 @@ class Experiment:
         if self.method == 'ssa':
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
+            self.makeStochScatterPlots()
         #self.plotTrajectories()
         #self.makeScatterPlots()
         self.writeBindingPartners()
@@ -838,7 +863,7 @@ class Ensemble:
                 self.randParams.set(param, paramRange[i - 1])
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
-                                     self.randParams.params, alpha=self.alpha,
+                                     self.randParams, alpha=self.alpha,
                                      seed=s, linearSampling=self.linearSampling)
 
             e = Experiment(self, self.method, model, self.tEnd, self.outFreq,
