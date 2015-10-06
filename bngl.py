@@ -17,7 +17,7 @@ _debugging = False
 
 
 class CernetModel:
-    def __init__(self, home, m, n, k, index, paramDict, seed=None, alpha=None,
+    def __init__(self, home, m, n, k, index, paramRange, seed=None, alpha=None,
                  volScaling=False, template=None, linearSampling=False):
 
         if seed is not None:
@@ -51,7 +51,7 @@ class CernetModel:
         count = self.createMolTypes(count)
         count = self.createComplexes(count)
         self.createObservables()
-        self.createRulesAndParams(paramDict, linearSampling=linearSampling,
+        self.createRulesAndParams(paramRange, linearSampling=linearSampling,
                                   alpha=alpha)
         self.writeNetworkFiles()
 
@@ -167,28 +167,32 @@ class CernetModel:
                                 mol, count))
             count += 1
 
-    def createRulesAndParams(self, paramDict, volScaling=False, alpha=None,
+    def createRulesAndParams(self, paramRange, volScaling=False, alpha=None,
                              linearSampling=False):
         # Add basic cell params
-        #self.params.append(BnglParameter('V', paramDict['vol']))
+        #self.params.append(BnglParameter('V', paramRange['vol']))
         #self.params.append(BnglParameter('NA', '6.0221415e+23'))
         #self.params.append(BnglParameter('volScale', 'NA*V*1e-6'))
 
         count = 0
         pCount = rCount = 1
+        pVal = 0.0
         # Production rules
         for mol in self.ceRNAs:
             # Choose param val
-            minVal = paramDict['pR'][0]
-            maxVal = paramDict['pR'][1]
-            if linearSampling:
-                randVal = random.uniform(minVal, maxVal)
+            if paramRange.isFixed():
+                pVal = paramRange.getMin('pR')
             else:
-                randVal = math.exp(random.uniform(math.log(minVal),
-                                              math.log(maxVal)))
+                minVal = paramRange.getMin('pR')
+                maxVal = paramRange.getMax('pR')
+                if linearSampling:
+                    pVal = random.uniform(minVal, maxVal)
+                else:
+                    pVal = math.exp(random.uniform(math.log(minVal),
+                                                  math.log(maxVal)))
             param = 'pR_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal, pCount))
-            mol.prodRate = randVal
+            self.params.append(BnglParameter(param, pVal, pCount))
+            mol.prodRate = pVal
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param, rCount))
@@ -202,16 +206,18 @@ class CernetModel:
         count = 0
         for mol in self.miRNAs:
             # Choose param val
-            minVal = paramDict['pS'][0]
-            maxVal = paramDict['pS'][1]
+            if paramRange.isFixed():
+                pVal = paramRange.getMin('pS')
+            minVal = paramRange.getMin('pS')
+            maxVal = paramRange.getMax('pS')
             if linearSampling:
-                randVal = random.uniform(minVal, maxVal)
+                pVal = random.uniform(minVal, maxVal)
             else:
-                randVal = math.exp(random.uniform(math.log(minVal),
+                pVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
             param = 'pS_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal, pCount))
-            mol.prodRate = randVal
+            self.params.append(BnglParameter(param, pVal, pCount))
+            mol.prodRate = pVal
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param, rCount))
@@ -225,16 +231,18 @@ class CernetModel:
         count = 0
         for mol in self.ceRNAs:
             # Choose param val
-            minVal = paramDict['dR'][0]
-            maxVal = paramDict['dR'][1]
+            if paramRange.isFixed():
+                pVal = paramRange.getMin('dR')
+            minVal = paramRange.getMin('dR')
+            maxVal = paramRange.getMax('dR')
             if linearSampling:
-                randVal = random.uniform(minVal, maxVal)
+                pVal = random.uniform(minVal, maxVal)
             else:
-                randVal = math.exp(random.uniform(math.log(minVal),
+                pVal = math.exp(random.uniform(math.log(minVal),
                                                   math.log(maxVal)))
             param = 'dR_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal, pCount))
-            mol.decayRate = randVal
+            self.params.append(BnglParameter(param, pVal, pCount))
+            mol.decayRate = pVal
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param, rCount))
@@ -247,16 +255,18 @@ class CernetModel:
         count = 0
         for mol in self.miRNAs:
             # Choose param val
-            minVal = paramDict['dS'][0]
-            maxVal = paramDict['dS'][1]
+            if paramRange.isFixed():
+                pVal = paramRange.getMin('dS')
+            minVal = paramRange.getMin('dS')
+            maxVal = paramRange.getMax('dS')
             if linearSampling:
-                randVal = random.uniform(minVal, maxVal)
+                pVal = random.uniform(minVal, maxVal)
             else:
-                randVal = math.exp(random.uniform(math.log(minVal),
+                pVal = math.exp(random.uniform(math.log(minVal),
                                                   math.log(maxVal)))
             param = 'dS_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal, pCount))
-            mol.decayRate = randVal
+            self.params.append(BnglParameter(param, pVal, pCount))
+            mol.decayRate = pVal
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param, rCount))
@@ -271,19 +281,23 @@ class CernetModel:
             molX = comp.molX
             molY = comp.molY
 
-            bMin = paramDict['b'][0]
-            bMax = paramDict['b'][1]
-            uMin = paramDict['u'][0]
-            uMax = paramDict['u'][1]
-
-            if linearSampling:
-                bRand = random.uniform(bMin, bMax)
-                uRand = random.uniform(uMin, uMax)
+            if paramRange.isFixed():
+                bRand = paramRange.getMin('b')
+                uRand = paramRange.getMin('u')
             else:
-                bRand = math.exp(random.uniform(math.log(bMin),
-                                                math.log(bMax)))
-                uRand = math.exp(random.uniform(math.log(uMin),
-                                                math.log(uMax)))
+                bMin = paramRange.getMin('b')
+                bMax = paramRange.getMax('b')
+                uMin = paramRange.getMin('u')
+                uMax = paramRange.getMax('u')
+
+                if linearSampling:
+                    bRand = random.uniform(bMin, bMax)
+                    uRand = random.uniform(uMin, uMax)
+                else:
+                    bRand = math.exp(random.uniform(math.log(bMin),
+                                                    math.log(bMax)))
+                    uRand = math.exp(random.uniform(math.log(uMin),
+                                                    math.log(uMax)))
 
             bName = 'b_{0}_{1}'.format(molX.num, molY.num)
             uName = 'u_{0}_{1}'.format(molX.num, molY.num)
@@ -312,27 +326,31 @@ class CernetModel:
             molX = comp.molX
             molY = comp.molY
 
-            aMin = paramDict['a'][0]
-            aMax = paramDict['a'][1]
-            cMin = paramDict['c'][0]
-            cMax = paramDict['c'][1]
-
-            if linearSampling:
-                if alpha is None:
-                    aRand = random.uniform(aMin, aMax)
-                else:
-                    aRand = alpha
-
-                cRand = random.uniform(cMin, cMax)
+            if paramRange.isFixed():
+                aRand = paramRange.getMin('a')
+                cRand = paramRange.getMin('c')
             else:
-                if alpha is None:
-                    aRand = math.exp(random.uniform(math.log(aMin),
-                                                    math.log(aMax)))
-                else:
-                    aRand = alpha
+                aMin = paramRange.getMin('a')
+                aMax = paramRange.getMax('a')
+                cMin = paramRange.getMin('c')
+                cMax = paramRange.getMax('c')
 
-                cRand = math.exp(random.uniform(math.log(cMin),
-                                                math.log(cMax)))
+                if linearSampling:
+                    if alpha is None:
+                        aRand = random.uniform(aMin, aMax)
+                    else:
+                        aRand = alpha
+
+                    cRand = random.uniform(cMin, cMax)
+                else:
+                    if alpha is None:
+                        aRand = math.exp(random.uniform(math.log(aMin),
+                                                        math.log(aMax)))
+                    else:
+                        aRand = alpha
+
+                    cRand = math.exp(random.uniform(math.log(cMin),
+                                                    math.log(cMax)))
 
             aName = 'a_{0}_{1}'.format(molX.num, molY.num)
             cName = 'c_{0}_{1}'.format(molX.num, molY.num)
@@ -362,19 +380,19 @@ class CernetModel:
 
         assert count == (self.n * self.k)
 
-    def createRulesAndParams_log(self, paramDict, volScaling=False):
+    def createRulesAndParams_log(self, paramRange, volScaling=False):
         # Production rules
         count = 0
         for mol in self.ceRNAs:
             # Choose param val
-            minVal = paramDict['pR'][0]
-            maxVal = paramDict['pR'][1]
-            #randVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
-            randVal = math.exp(random.uniform(math.log(minVal),
+            minVal = paramRange['pR'][0]
+            maxVal = paramRange['pR'][1]
+            #pVal = 10.0 ** math.log10(random.uniform(minVal, maxVal))
+            pVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
             param = 'pR_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
-            mol.prodRate = randVal
+            self.params.append(BnglParameter(param, pVal))
+            mol.prodRate = pVal
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
@@ -386,13 +404,13 @@ class CernetModel:
         count = 0
         for mol in self.miRNAs:
             # Choose param val
-            minVal = paramDict['pS'][0]
-            maxVal = paramDict['pS'][1]
-            randVal = math.exp(random.uniform(math.log(minVal),
+            minVal = paramRange['pS'][0]
+            maxVal = paramRange['pS'][1]
+            pVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
             param = 'pS_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
-            mol.prodRate = randVal
+            self.params.append(BnglParameter(param, pVal))
+            mol.prodRate = pVal
 
             # Create rule
             self.rules.append(BnglProductionRule(mol, param))
@@ -404,14 +422,14 @@ class CernetModel:
         count = 0
         for mol in self.ceRNAs:
             # Choose param val
-            minVal = paramDict['dR'][0]
-            maxVal = paramDict['dR'][1]
-            randVal = math.exp(random.uniform(math.log(minVal),
+            minVal = paramRange['dR'][0]
+            maxVal = paramRange['dR'][1]
+            pVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
 
             param = 'dR_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
-            mol.decayRate = randVal
+            self.params.append(BnglParameter(param, pVal))
+            mol.decayRate = pVal
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
@@ -422,14 +440,14 @@ class CernetModel:
         count = 0
         for mol in self.miRNAs:
             # Choose param val
-            minVal = paramDict['dS'][0]
-            maxVal = paramDict['dS'][1]
-            randVal = math.exp(random.uniform(math.log(minVal),
+            minVal = paramRange['dS'][0]
+            maxVal = paramRange['dS'][1]
+            pVal = math.exp(random.uniform(math.log(minVal),
                                               math.log(maxVal)))
 
             param = 'dS_%d' % mol.num
-            self.params.append(BnglParameter(param, randVal))
-            mol.decayRate = randVal
+            self.params.append(BnglParameter(param, pVal))
+            mol.decayRate = pVal
 
             # Create rule
             self.rules.append(BnglDecayRule(mol, param))
@@ -442,10 +460,10 @@ class CernetModel:
             molX = comp.molX
             molY = comp.molY
 
-            bMin = paramDict['b'][0]
-            bMax = paramDict['b'][1]
-            uMin = paramDict['u'][0]
-            uMax = paramDict['u'][1]
+            bMin = paramRange['b'][0]
+            bMax = paramRange['b'][1]
+            uMin = paramRange['u'][0]
+            uMax = paramRange['u'][1]
 
             bRand = math.exp(random.uniform(math.log(bMin),
                                               math.log(bMax)))
@@ -474,10 +492,10 @@ class CernetModel:
             molX = comp.molX
             molY = comp.molY
 
-            aMin = paramDict['a'][0]
-            aMax = paramDict['a'][1]
-            cMin = paramDict['c'][0]
-            cMax = paramDict['c'][1]
+            aMin = paramRange['a'][0]
+            aMax = paramRange['a'][1]
+            cMin = paramRange['c'][0]
+            cMax = paramRange['c'][1]
 
             aRand = math.exp(random.uniform(math.log(aMin),
                                               math.log(aMax)))
