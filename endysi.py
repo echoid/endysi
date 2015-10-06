@@ -33,6 +33,8 @@ _seeding = True
 # global setting for alpha ranging
 _rangingAlpha = True
 
+_plottingTrajectories = True
+
 # colours
 purple = '#673594'
 magenta = '#a0228d'
@@ -324,7 +326,7 @@ class Experiment:
     def calcAutocorrelations(self):
         maxHalfLife = 70000
         halfLifeMults = 2
-        simTime = maxHalfLife * halfLifeMults * nSamples
+        simTime = maxHalfLife * halfLifeMults * self.nSamples
         sampFreq = int((simTime / self.outFreq) / self.nSamples)
         maxDelta = 50
         startPoint = sampFreq
@@ -386,15 +388,18 @@ class Experiment:
             return
 
         sampFreq = int(140000 / self.outFreq)
-        samplePoints = list(range(sampFreq, self.nSamples * sampFreq, sampFreq))
+        samplePoints = list(range(sampFreq, (self.nSamples + 1) * sampFreq,
+                            sampFreq))
 
         dt = [('ceRNA1', 'f8'), ('ceRNA2', 'f8')]
         molData = np.zeros(len(samplePoints), dtype=dt)
 
         # grab data at the sample frequency
+        count = 0
         for i in samplePoints:
-            molData['ceRNA1'][i] = self.equilData['ceRNA1_free'][i]
-            molData['ceRNA2'][i] = self.equilData['ceRNA2_free'][i]
+            molData['ceRNA1'][count] = self.equilData['ceRNA1'][i]
+            molData['ceRNA2'][count] = self.equilData['ceRNA2'][i]
+            count += 1
 
         # Write results to files
         fn = self.model.filePath + '_ceRNA_samples.csv'
@@ -504,7 +509,10 @@ class Experiment:
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
             self.makeStochScatterPlots()
-        #self.plotTrajectories()
+
+        if _plottingTrajectories:
+            self.plotTrajectories()
+
         #self.makeScatterPlots()
         self.writeBindingPartners()
         #self.makeFoldPlots()
@@ -519,14 +527,18 @@ class Experiment:
 class Ensemble:
     def __init__(self, m, n, k, size, method, tEnd, outFreq, nSamples,
                  randParams, timestamp=None, baseDir=None, seedScale=None,
-                 alpha=None, linearSampling=1):
+                 alpha=None, linearSampling=0, name=None):
 
         if timestamp is None:
             self.timestamp = genTimeString()
         else:
             self.timestamp = timestamp
 
-        self.name = 'ceRNET_%dx%dc%dx%d' % (m, n, k, size)
+        if name is None:
+            self.name = 'ceRNET_%dx%dc%dx%d' % (m, n, k, size)
+        else:
+            self.name = name
+
         self.m = m
         self.n = n
         self.k = k
@@ -581,6 +593,7 @@ class Ensemble:
         del self.size
         del self.method
         del self.nSamples
+        del self.ceWCCCs
 
     def createLoggers(self):
         # create loggers and set levels
@@ -722,6 +735,9 @@ class Ensemble:
         fn = join(self.resultsDir, self.name + '_allWCCs.csv')
         _writeListToCSV(fn, rVals, 'r')
 
+        # store rVals temporarily
+        self.ceWCCCs = np.array(rVals)
+
         return
 
     def calcAutocorrelations(self):
@@ -843,11 +859,21 @@ class Ensemble:
             self.calcAutocorrelations()
         return
 
-    def runAll(self, param=None, pMin=None, pMax=None):
-        paramRange = None
-        if param is not None:
-            paramRange = np.logspace(np.log10(pMin), np.log10(pMax),
-                                     num=self.size)
+    def runAll(self):
+        # create pRange for fixed param runs
+        pRange = None
+        if self.randParams.isFixed():
+            #pRange = np.linspace(self.randParams.pMin, self.randParams.pMax,
+                                 #num=self.size)
+            pRange = np.logspace(np.log10(self.randParams.pMin),
+                                 np.log10(self.randParams.pMax),
+                                 num=self.size)
+
+            # save the range to file
+            fn = join(self.resultsDir, self.name + '_%s_range' %
+                      self.randParams.pRanged)
+            np.savetxt(fn, pRange)
+            self.pRange = pRange
 
         tStart = time.time()
         for i in range(1, self.size + 1):
@@ -859,8 +885,8 @@ class Ensemble:
                 if self.seedScale is not None:
                     s *= self.seedScale
 
-            if param is not None:
-                self.randParams.set(param, paramRange[i - 1])
+            if pRange is not None:
+                self.randParams.set(self.randParams.pRanged, (pRange[i - 1],))
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      self.randParams, alpha=self.alpha,

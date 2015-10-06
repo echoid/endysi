@@ -208,13 +208,14 @@ class CernetModel:
             # Choose param val
             if paramRange.isFixed():
                 pVal = paramRange.getMin('pS')
-            minVal = paramRange.getMin('pS')
-            maxVal = paramRange.getMax('pS')
-            if linearSampling:
-                pVal = random.uniform(minVal, maxVal)
             else:
-                pVal = math.exp(random.uniform(math.log(minVal),
-                                              math.log(maxVal)))
+                minVal = paramRange.getMin('pS')
+                maxVal = paramRange.getMax('pS')
+                if linearSampling:
+                    pVal = random.uniform(minVal, maxVal)
+                else:
+                    pVal = math.exp(random.uniform(math.log(minVal),
+                                                  math.log(maxVal)))
             param = 'pS_%d' % mol.num
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.prodRate = pVal
@@ -233,13 +234,14 @@ class CernetModel:
             # Choose param val
             if paramRange.isFixed():
                 pVal = paramRange.getMin('dR')
-            minVal = paramRange.getMin('dR')
-            maxVal = paramRange.getMax('dR')
-            if linearSampling:
-                pVal = random.uniform(minVal, maxVal)
             else:
-                pVal = math.exp(random.uniform(math.log(minVal),
-                                                  math.log(maxVal)))
+                minVal = paramRange.getMin('dR')
+                maxVal = paramRange.getMax('dR')
+                if linearSampling:
+                    pVal = random.uniform(minVal, maxVal)
+                else:
+                    pVal = math.exp(random.uniform(math.log(minVal),
+                                                      math.log(maxVal)))
             param = 'dR_%d' % mol.num
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.decayRate = pVal
@@ -257,13 +259,14 @@ class CernetModel:
             # Choose param val
             if paramRange.isFixed():
                 pVal = paramRange.getMin('dS')
-            minVal = paramRange.getMin('dS')
-            maxVal = paramRange.getMax('dS')
-            if linearSampling:
-                pVal = random.uniform(minVal, maxVal)
             else:
-                pVal = math.exp(random.uniform(math.log(minVal),
-                                                  math.log(maxVal)))
+                minVal = paramRange.getMin('dS')
+                maxVal = paramRange.getMax('dS')
+                if linearSampling:
+                    pVal = random.uniform(minVal, maxVal)
+                else:
+                    pVal = math.exp(random.uniform(math.log(minVal),
+                                                      math.log(maxVal)))
             param = 'dS_%d' % mol.num
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.decayRate = pVal
