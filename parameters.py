@@ -6,9 +6,10 @@ from __future__ import print_function
 
 
 class ParameterRange(object):
-    def __init__(self, name):
+    def __init__(self, name, fixed=False):
         self.name = name
         self.params = {}
+        self.fixed = fixed
 
     def get(self, param):
         if param in self.params:
@@ -17,8 +18,29 @@ class ParameterRange(object):
             print('Parameter %s not found!' % param)
             return None
 
+    def getMin(self, param):
+        p = self.get(param)
+        if p is None:
+            return None
+        else:
+            return p[0]
+
+    def getMax(self, param):
+        p = self.get(param)
+        if p is None:
+            return p
+
+        if len(p) == 2:
+            return p[1]
+        else:
+            print('Parameter %s is fixed; no max val available!' % param)
+            return None
+
     def set(self, param, val):
         self.params[param] = val
+
+    def isFixed(self):
+        return self.fixed
 
 
 class NitzanParameters(ParameterRange):
@@ -80,11 +102,11 @@ class NitzanParametersExpanded(NitzanParameters):
 class Figure1Parameters(ParameterRange):
 
     def __init__(self):
-        super(Figure1Parameters, self).__init__("Figure1Parameters")
-        self.params = {'pR': (2.4e-03, 2.4e-03), 'pS': (2.4e-02, 2.4e-02),
-                       'dR': (1e-04, 1e-04), 'dS': (2.5e-04, 2.5e-04),
-                       'b': (1e-03, 1e-03), 'u': (1e-03, 1e-03),
-                       'c': (0.035, 0.035), 'a': (0.5, 0.5)}
+        super(Figure1Parameters, self).__init__("Figure1Parameters", fixed=True)
+        self.params = {'pR': (2.4e-03,), 'pS': (2.4e-02,),
+                       'dR': (1e-04,), 'dS': (2.5e-04,),
+                       'b': (1e-03,), 'u': (1e-03,),
+                       'c': (0.035,), 'a': (0.5,)}
 
     def set(self, param, val):
         self.params[param] = val
