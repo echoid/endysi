@@ -33,7 +33,7 @@ _seeding = True
 # global setting for alpha ranging
 _rangingAlpha = True
 
-_plottingTrajectories = True
+_plottingTrajectories = False
 
 # colours
 purple = '#673594'
@@ -272,10 +272,17 @@ class Experiment:
     def calcWithinConditionCorrelations(self):
         # Pair up molecules for correlations
         cePairs = list(combinations(self.ceRNAs, 2))
+        if self.parent.m > 1:
+            miPairs = list(combinations(self.miRNAs, 2))
 
         # Create tables for results
         self.ceEquilWCCs = np.zeros(len(cePairs), dtype=[('mol pair', 'a20'),
                                     ('r', 'f8'), ('p', 'f8')])
+
+        if self.parent.m > 1:
+            self.miEquilWCCs = np.zeros(len(miPairs), dtype=[
+                                        ('mol pair', 'a20'), ('r', 'f8'),
+                                        ('p', 'f8')])
 
         sampFreq = int(140000 / self.outFreq)
         samplePoints = list(range(sampFreq, self.nSamples * sampFreq, sampFreq))
@@ -284,6 +291,7 @@ class Experiment:
         self.nanDir = join(self.parent.resultsDir, 'nanData')
         makeDirs(self.nanDir)
 
+        # ceRNAs
         count = 0
         nans = 0
         for pair in cePairs:
@@ -302,13 +310,13 @@ class Experiment:
             if math.isnan(r):
                 nans += 1
                 r = 0.0
-                nanData = np.zeros(self.nSamples - 1, dtype=[(mol1, 'f8'),
-                                                         (mol2, 'f8')])
-                nanData[mol1] = mol1data
-                nanData[mol2] = mol2data
-                fn = join(self.nanDir, '%s_%s_%s.csv' % (self.model.name, mol1,
-                                                         mol2))
-                _writeDataToCSV(fn, nanData, frmt=('%.18e', '%.18e'))
+                #nanData = np.zeros(self.nSamples - 1, dtype=[(mol1, 'f8'),
+                                                         #(mol2, 'f8')])
+                #nanData[mol1] = mol1data
+                #nanData[mol2] = mol2data
+                #fn = join(self.nanDir, '%s_%s_%s.csv' % (self.model.name, mol1,
+                                                         #mol2))
+                #_writeDataToCSV(fn, nanData, frmt=('%.18e', '%.18e'))
 
             pairString = '(%s, %s)' % (mol1, mol2)
             self.ceEquilWCCs['mol pair'][count] = pairString
@@ -317,9 +325,49 @@ class Experiment:
 
             count += 1
 
+        # miRNAs
+        count = 0
+        nans = 0
+        if self.parent.m > 1:
+            for pair in miPairs:
+                mol1 = pair[0]
+                mol2 = pair[1]
+                mol1data = []
+                mol2data = []
+
+                # grab data at the sample frequency
+                for i in samplePoints:
+                    mol1data.append(self.equilData[mol1][i])
+                    mol2data.append(self.equilData[mol2][i])
+
+                (r, p) = pearsonr(mol1data, mol2data)
+
+                if math.isnan(r):
+                    nans += 1
+                    r = 0.0
+                    #nanData = np.zeros(self.nSamples - 1, dtype=[(mol1, 'f8'),
+                                            #(mol2, 'f8')])
+                    #nanData[mol1] = mol1data
+                    #nanData[mol2] = mol2data
+                    #fn = join(self.nanDir, '%s_%s_%s.csv' % (self.model.name,
+                                                             #mol1, mol2))
+                    #_writeDataToCSV(fn, nanData, frmt=('%.18e', '%.18e'))
+
+                pairString = '(%s, %s)' % (mol1, mol2)
+                self.miEquilWCCs['mol pair'][count] = pairString
+                self.miEquilWCCs['r'][count] = r
+                self.miEquilWCCs['p'][count] = p
+
+                count += 1
+
         # Write results to files
         fn = self.model.filePath + '_ceRNA_WCCs.csv'
         _writeDataToCSV(fn, self.ceEquilWCCs, frmt=('%20s', '%.18e', '%.18e'))
+
+        if self.parent.m > 1:
+            fn = self.model.filePath + '_miRNA_WCCs.csv'
+            _writeDataToCSV(fn, self.miEquilWCCs, frmt=('%20s', '%.18e',
+                                                        '%.18e'))
 
         return
 
@@ -508,7 +556,7 @@ class Experiment:
         if self.method == 'ssa':
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
-            self.makeStochScatterPlots()
+            #self.makeStochScatterPlots()
 
         if _plottingTrajectories:
             self.plotTrajectories()
@@ -584,7 +632,7 @@ class Ensemble:
         return
 
     def purge(self):
-        del self.randParams
+        #del self.randParams
         del self.tEnd
         del self.linearSampling
         del self.m
@@ -593,7 +641,6 @@ class Ensemble:
         del self.size
         del self.method
         del self.nSamples
-        del self.ceWCCCs
 
     def createLoggers(self):
         # create loggers and set levels
@@ -886,7 +933,7 @@ class Ensemble:
                     s *= self.seedScale
 
             if pRange is not None:
-                self.randParams.set(self.randParams.pRanged, (pRange[i - 1],))
+                self.randParams.set(self.randParams.pRanged, pRange[i - 1])
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      self.randParams, alpha=self.alpha,

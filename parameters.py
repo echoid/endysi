@@ -37,7 +37,10 @@ class ParameterRange(object):
             return None
 
     def set(self, param, val):
-        self.params[param] = val
+        if isinstance(val, tuple):
+            self.params[param] = val
+        else:
+            self.params[param] = (val,)
 
     def isFixed(self):
         return self.fixed
@@ -100,6 +103,9 @@ class NitzanParametersExpanded(NitzanParameters):
 
 
 class FixedParameterRange(ParameterRange):
+    """Generic fixed parameter class.
+
+    """
 
     def __init__(self, name, pRanged, pMin, pMax):
         super(FixedParameterRange, self).__init__(name, fixed=True)
@@ -110,16 +116,25 @@ class FixedParameterRange(ParameterRange):
         self.name += '_%s_%f-%f' % (pRanged, pMin, pMax)
 
 
+#class Figure1Parameters(FixedParameterRange):
+
+    #def __init__(self):
+        #super(Figure1Parameters, self).__init__("Figure1Parameters", 'pS',
+                                                #2.4e-04, 2.4e-02)
+
+        #self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
+                       #'dR': (1e-04,), 'dS': (2.5e-04,),
+                       #'b': (1e-03,), 'u': (1e-03,),
+                       #'c': (0.035,), 'a': (0.5,)}
+
+
 class Figure1Parameters(FixedParameterRange):
 
     def __init__(self):
         super(Figure1Parameters, self).__init__("Figure1Parameters", 'pS',
                                                 2.4e-04, 2.4e-02)
 
-        self.params = {'pR': (2.4e-03,), 'pS': (2.4e-02,),
+        self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
                        'dR': (1e-04,), 'dS': (2.5e-04,),
                        'b': (1e-03,), 'u': (1e-03,),
                        'c': (0.035,), 'a': (0.5,)}
-
-    def set(self, param, val):
-        self.params[param] = val
