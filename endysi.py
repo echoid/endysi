@@ -561,7 +561,7 @@ class Experiment:
         if _plottingTrajectories:
             self.plotTrajectories()
 
-        #self.makeScatterPlots()
+        self.makeScatterPlots()
         self.writeBindingPartners()
         #self.makeFoldPlots()
         #self.deleteData()
@@ -724,6 +724,45 @@ class Ensemble:
         # Write to file
         fn = join(self.resultsDir, self.name + '_steadyStates.csv')
         _writeDataToCSV(fn, self.equilSS)
+
+        return
+
+    def calcBalance(self):
+        # Calc RNA means
+        names = self.experiments[0].equilSS.dtype.names
+        dt = [('model', 'i4'), ('ceMean', 'f8'), ('miMean', 'f8')]
+        self.equilMeans = np.zeros(self.size, dtype=dt)
+
+        for experiment in self.experiments:
+            i = experiment.model.index
+            self.equilMeans['model'][i - 1] = i
+            miTot = 0
+            ceTot = 0
+            ceCount = 0.0
+            miCount = 0.0
+
+            for name in names:
+                if 'mi' in name:
+                    miTot += experiment.equilSS[name][0]
+                    miCount += 1.0
+                elif 'ce' in name:
+                    ceTot += experiment.equilSS[name][0]
+                    ceCount += 1.0
+
+            self.equilMeans['miMean'][i - 1] = miTot / miCount
+            self.equilMeans['ceMean'][i - 1] = ceTot / ceCount
+
+        # Plot balance for the ensemble
+        fn = join(self.resultsDir, self.name + '_RNA_means.csv')
+        _writeDataToCSV(fn, self.equilMeans)
+
+        fn = join(self.resultsDir, self.name + '_RNA_scatter.png')
+        _scatterPlot(fn, self.equilMeans['ceMean'], self.equilMeans['miMean'],
+                     False, 'average ceRNA', 'average miRNA')
+
+        # calc overall mean
+        self.ceMean = np.mean(self.equilMeans['ceMean'])
+        self.miMean = np.mean(self.equilMeans['miMean'])
 
         return
 
@@ -897,7 +936,8 @@ class Ensemble:
 
     def runAnalyses(self):
         self.collectSteadyStates()
-        self.calcMolSums()
+        #self.calcMolSums()
+        self.calcBalance()
 
         if self.method == 'ode':
             self.calcCrossConditionCorrelations()
@@ -1169,6 +1209,50 @@ class Population:
         plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
         plt.close(fig)
 
+    def calcBalance(self):
+        # Create a table for results
+        dt = [('ens', 'i4'), ('norm avg ceRNA', 'f8'), ('norm avg miRNA', 'f8'),
+              ('avg ceCCC', 'f8'), ('avg miCCC', 'f8')]
+        self.nSSandR = np.zeros(self.p, dtype=dt)
+
+        # Gather means from the ensembles
+        ceMeans = [e.ceMean for e in self.ensembles]
+        miMeans = [e.miMean for e in self.ensembles]
+
+        # Normalize and store
+        for i in range(self.p):
+            # Norm'd means
+            self.nSSandR['ens'][i] = i + 1
+            denom = ceMeans[i] + miMeans[i]
+            self.nSSandR['norm avg ceRNA'][i] = ceMeans[i] / denom
+            self.nSSandR['norm avg miRNA'][i] = miMeans[i] / denom
+
+            # Mean correlation
+            e = self.ensembles[i]
+            self.nSSandR['avg ceCCC'][i] = np.mean(e.ceEquilCCs['r'])
+            if self.m > 1:
+                self.nSSandR['avg miCCC'][i] = np.mean(e.miEquilCCs['r'])
+
+        # Save to file
+        _writeDataToCSV(join(self.resultsDir, 'normSSandR.csv'), self.nSSandR)
+
+        # Plot it
+        fig = plt.figure()
+        plt.scatter(self.nSSandR['norm avg ceRNA'], self.nSSandR['avg ceCCC'],
+                 color='b', label='ceRNA')
+        plt.scatter(self.nSSandR['norm avg miRNA'], self.nSSandR['avg miCCC'],
+                 color='r', label='miRNA')
+
+        t = 'Normalized Average RNA vs Average cross-conditional Correlation'
+        fig.suptitle(t)
+        plt.xlabel('Average RNA steady state')
+        plt.ylabel('Average CCC')
+
+        # Save it
+        fn = join(self.resultsDir, 'nSSandCCC.png')
+        plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
+        plt.close(fig)
+
     def collectCrossConditionCorrelations(self):
         ceCCs = []
         miCCs = []
@@ -1209,6 +1293,7 @@ class Population:
 
     def runAnalysis(self):
         self.collectCrossConditionCorrelations()
+        self.calcBalance()
 
         if self.rangingAlpha:
             self.alphaAnalysis()
