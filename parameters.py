@@ -6,7 +6,7 @@ from __future__ import print_function
 
 
 class ParameterRange(object):
-    def __init__(self, name, fixed=False):
+    def __init__(self, name, fixed=False, direct=False):
         self.name = name
         self.params = {}
         self.fixed = fixed
@@ -44,6 +44,9 @@ class ParameterRange(object):
 
     def isFixed(self):
         return self.fixed
+
+    def isDirect(self):
+        return self.direct
 
 
 class NitzanParameters(ParameterRange):
@@ -128,13 +131,34 @@ class FixedParameterRange(ParameterRange):
                        #'c': (0.035,), 'a': (0.5,)}
 
 
-class Figure1Parameters(FixedParameterRange):
+class Figure1Parameters_old(FixedParameterRange):
 
     def __init__(self):
-        super(Figure1Parameters, self).__init__("Figure1Parameters", 'pS',
-                                                2.4e-04, 2.4e-02)
+        super(Figure1Parameters_old, self).__init__("Figure1Parameters_old",
+              'pS', 2.4e-04, 2.4e-02)
 
         self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
                        'dR': (1e-04,), 'dS': (2.5e-04,),
                        'b': (1e-03,), 'u': (1e-03,),
                        'c': (0.035,), 'a': (0.5,)}
+
+
+class DirectFixedParameters(FixedParameterRange):
+
+    def __init__(self, name, pRanged, pIndex, pMin, pMax):
+        super(DirectFixedParameters, self).__init__(name, fixed=True,
+            direct=True)
+
+        self.pRanged = pRanged
+        self.pIndex = pIndex
+        self.pName = '%s_%d' % (pRanged, pIndex)
+        self.pVal = 0.0
+        self.pMin = pMin
+        self.pMax = pMax
+
+        self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
+                       'dR': (1e-04,), 'dS': (2.5e-04,),
+                       'b': (1e-03,), 'u': (1e-03,),
+                       'c': (0.035,), 'a': (0.5,)}
+
+        self.name += '_curr_%f' % self.pVal

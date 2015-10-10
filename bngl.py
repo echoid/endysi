@@ -191,6 +191,9 @@ class CernetModel:
                     pVal = math.exp(random.uniform(math.log(minVal),
                                                   math.log(maxVal)))
             param = 'pR_%d' % mol.num
+
+            if paramRange.isDirect() and param == paramRange.pName:
+                pVal = paramRange.pVal
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.prodRate = pVal
 
@@ -217,6 +220,10 @@ class CernetModel:
                     pVal = math.exp(random.uniform(math.log(minVal),
                                                   math.log(maxVal)))
             param = 'pS_%d' % mol.num
+
+            if paramRange.isDirect() and param == paramRange.pName:
+                pVal = paramRange.pVal
+
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.prodRate = pVal
 
@@ -243,6 +250,9 @@ class CernetModel:
                     pVal = math.exp(random.uniform(math.log(minVal),
                                                       math.log(maxVal)))
             param = 'dR_%d' % mol.num
+            if paramRange.isDirect() and param == paramRange.pName:
+                pVal = paramRange.pVal
+
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.decayRate = pVal
 
@@ -268,6 +278,10 @@ class CernetModel:
                     pVal = math.exp(random.uniform(math.log(minVal),
                                                       math.log(maxVal)))
             param = 'dS_%d' % mol.num
+
+            if paramRange.isDirect() and param == paramRange.pName:
+                pVal = paramRange.pVal
+
             self.params.append(BnglParameter(param, pVal, pCount))
             mol.decayRate = pVal
 
