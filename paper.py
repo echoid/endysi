@@ -44,15 +44,12 @@ def figure1():
     m = 1
     n = 2
     k = 1
-    s = 100
+    s = 10
     outFreq = 100
     method = 'ssa'
     maxHalfLife = 70000
     halfLifeMults = 2
-    nSamples = 1
-
-    if method == 'ssa':
-        nSamples = 100
+    nSamples = 10
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
@@ -68,13 +65,13 @@ def figure1():
 
     # Plot additional results
     # Make a table for the data
-    dt = [('miRNA trans rate', 'f8'), ('norm ceRNA1', 'f8'),
+    dt = [('ceRNA1 trans rate', 'f8'), ('norm ceRNA1', 'f8'),
           ('norm ceRNA2', 'f8'), ('norm miRNA', 'f8'), ('pearson r', 'f8')]
 
     data = np.zeros(s, dtype=dt)
 
     # Gather the data
-    data['miRNA trans rate'] = ens.pRange
+    data['ceRNA1 trans rate'] = ens.pRange
 
     # Normalize steady states
     for i in range(s):
@@ -97,8 +94,8 @@ def figure1():
 
     # Plot data
     fn = join(ens.resultsDir, ens.name + '_normSS_and_R.png')
-    _plotData_semilogx(fn, data, 'miRNA trans rate',
-                       'miRNA transcription rate', '')
+    _plotData_semilogx(fn, data, 'ceRNA1 trans rate',
+                       'ceRNA1 transcription rate', '')
 
 if __name__ == '__main__':
     import argparse

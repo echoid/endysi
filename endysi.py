@@ -31,7 +31,7 @@ _dpi = 120
 _seeding = True
 
 # global setting for alpha ranging
-_rangingAlpha = True
+_rangingAlpha = False
 
 _plottingTrajectories = False
 
@@ -205,25 +205,14 @@ class Experiment:
         self.model.purge()
 
     def run(self):
-        # Initialize simulator
         os.chdir(self.model.home)
-        #self.simulator.initialize()
 
         # Equilibration phase
         self.opts['suf'] = 'equil'
         a = self.action % self.opts
-        #print(a)
+
         fn = self.model.filePath + '_sim_log.log'
         os.system(a + ' > ' + fn)
-        #simlog = open(fn, 'w')
-        #tout = 1000000
-        #pexpect.run(a, logfile=simlog, timeout=tout)
-        #simlog.close()
-        #self.simulator.sendAction(self.action % self.opts)
-        #self.simulator.saveConcentrations()
-
-        #self.simulator.done()
-        #self.simulator.close()
 
         return
 
@@ -556,12 +545,12 @@ class Experiment:
         if self.method == 'ssa':
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
-            #self.makeStochScatterPlots()
+            self.makeStochScatterPlots()
 
         if _plottingTrajectories:
             self.plotTrajectories()
 
-        self.makeScatterPlots()
+        #self.makeScatterPlots()
         self.writeBindingPartners()
         #self.makeFoldPlots()
         #self.deleteData()
@@ -730,12 +719,13 @@ class Ensemble:
     def calcBalance(self):
         # Calc RNA means
         names = self.experiments[0].equilSS.dtype.names
-        dt = [('model', 'i4'), ('ceMean', 'f8'), ('miMean', 'f8')]
-        self.equilMeans = np.zeros(self.size, dtype=dt)
+        dt = [('model', 'i4'), ('ceMean', 'f8'), ('miMean', 'f8'),
+              ('mean_ceCorr', 'f8'), ('mean_miCorr', 'f8')]
+        self.nSSandR = np.zeros(self.size, dtype=dt)
 
         for experiment in self.experiments:
             i = experiment.model.index
-            self.equilMeans['model'][i - 1] = i
+            self.nSSandR['model'][i - 1] = i
             miTot = 0
             ceTot = 0
             ceCount = 0.0
@@ -749,20 +739,65 @@ class Ensemble:
                     ceTot += experiment.equilSS[name][0]
                     ceCount += 1.0
 
-            self.equilMeans['miMean'][i - 1] = miTot / miCount
-            self.equilMeans['ceMean'][i - 1] = ceTot / ceCount
+            self.nSSandR['miMean'][i - 1] = miTot / miCount
+            self.nSSandR['ceMean'][i - 1] = ceTot / ceCount
+
+            if self.method == 'ode':
+                self.nSSandR['mean_ceCorr'][i - 1] = np.mean(
+                                self.ceEquilCCs['r'])
+                if self.m > 1:
+                    self.nSSandR['mean_miCorr'][i - 1] = np.mean(
+                                self.miEquilCCs['r'])
+
+            elif self.method == 'ssa':
+                self.nSSandR['mean_ceCorr'][i - 1] = np.mean(self.ceWCCCs)
+                if self.m > 1:
+                    self.nSSandR['mean_miCorr'][i - 1] = np.mean(self.miWCCCs)
 
         # Plot balance for the ensemble
-        fn = join(self.resultsDir, self.name + '_RNA_means.csv')
-        _writeDataToCSV(fn, self.equilMeans)
+        fn = join(self.resultsDir, self.name + '_nSSandRs.csv')
+        _writeDataToCSV(fn, self.nSSandR)
 
-        fn = join(self.resultsDir, self.name + '_RNA_scatter.png')
-        _scatterPlot(fn, self.equilMeans['ceMean'], self.equilMeans['miMean'],
-                     False, 'average ceRNA', 'average miRNA')
+        #fn = join(self.resultsDir, self.name + '_RNA_scatter.png')
+        #_scatterPlot(fn, self.nSSandR['ceMean'], self.nSSandR['miMean'],
+                     #False, 'average ceRNA', 'average miRNA')
+
+        # Only plot if this is not part of a population run
+        if self.method == 'ssa':
+            fig = plt.figure()
+            plt.scatter(self.nSSandR['ceMean'], self.nSSandR['mean_ceCorr'],
+                     color='b', label='ceRNA')
+
+            if self.m > 1:
+                plt.scatter(self.nSSandR['miMean'],
+                    self.nSSandR['mean_miCorr'], color='r', label='miRNA')
+
+                cType = ''
+                if self.method == 'ode':
+                    cType = 'CCC'
+                else:
+                    cType = 'WCC'
+
+                t = 'Normalized Average RNA vs Average %s Correlation' % cType
+                fig.suptitle(t)
+                plt.xlabel('Average RNA steady state')
+
+                yLabel = 'Average'
+                if self.method == 'ode':
+                    yLabel += 'CCC'
+                else:
+                    yLabel += 'WCC'
+
+                plt.ylabel(yLabel)
+
+                # Save it
+                fn = join(self.resultsDir, self.name + '_nSSand%s.png' % cType)
+                plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
+                plt.close(fig)
 
         # calc overall mean
-        self.ceMean = np.mean(self.equilMeans['ceMean'])
-        self.miMean = np.mean(self.equilMeans['miMean'])
+        self.ceMean = np.mean(self.nSSandR['ceMean'])
+        self.miMean = np.mean(self.nSSandR['miMean'])
 
         return
 
@@ -804,25 +839,38 @@ class Ensemble:
 
     def calcWithinConditionCorrelations(self):
         # i.e., stochastic fluctuation correlations
-        # yeah!
-        rVals = []
+        ceRVals = []
+        miRVals = None
+        if self.m < 1:
+            miRVals = []
+
         for e in self.experiments:
-            fn = e.model.filePath + '_ceRNA_WCCs.csv'
-            da = np.genfromtxt(fn, delimiter=';', names=True)
-
             if self.n <= 2:
-                rVals.append(da['r'])
+                ceRVals.append(e.ceEquilWCCs['r'])
             else:
-                rVals.extend(da['r'])
+                ceRVals.extend(e.ceEquilWCCs['r'])
 
-        fp = join(self.resultsDir, self.name + '_allWCCs')
-        _histogram(fp, rVals, 'r')
+            if self.m == 2:
+                miRVals.append(e.miEquilWCCs['r'])
+            elif self.m > 2:
+                miRVals.extend(e.miEquilWCCs['r'])
 
-        fn = join(self.resultsDir, self.name + '_allWCCs.csv')
-        _writeListToCSV(fn, rVals, 'r')
+        # plot and save
+        fp = join(self.resultsDir, self.name + '_ceWCCs')
+        _histogram(fp, ceRVals, 'r')
+
+        fn = join(self.resultsDir, self.name + '_ceWCCs.csv')
+        _writeListToCSV(fn, ceRVals, 'r')
+
+        fp = join(self.resultsDir, self.name + '_miWCCs')
+        _histogram(fp, miRVals, 'r')
+
+        fn = join(self.resultsDir, self.name + '_miWCCs.csv')
+        _writeListToCSV(fn, miRVals, 'r')
 
         # store rVals temporarily
-        self.ceWCCCs = np.array(rVals)
+        self.ceWCCCs = np.array(ceRVals)
+        self.miWCCCs = np.array(miRVals)
 
         return
 
@@ -937,13 +985,15 @@ class Ensemble:
     def runAnalyses(self):
         self.collectSteadyStates()
         #self.calcMolSums()
-        self.calcBalance()
 
         if self.method == 'ode':
             self.calcCrossConditionCorrelations()
         else:
             self.calcWithinConditionCorrelations()
             self.calcAutocorrelations()
+
+        self.calcBalance()
+
         return
 
     def runAll(self):
@@ -958,7 +1008,7 @@ class Ensemble:
 
             # save the range to file
             fn = join(self.resultsDir, self.name + '_%s_range' %
-                      self.randParams.pRanged)
+                      self.randParams.pName)
             np.savetxt(fn, pRange)
             self.pRange = pRange
 
@@ -973,7 +1023,10 @@ class Ensemble:
                     s *= self.seedScale
 
             if pRange is not None:
-                self.randParams.set(self.randParams.pRanged, pRange[i - 1])
+                if self.randParams.isDirect():
+                    self.randParams.pVal = pRange[i - 1]
+                else:
+                    self.randParams.set(self.randParams.pRanged, pRange[i - 1])
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      self.randParams, alpha=self.alpha,

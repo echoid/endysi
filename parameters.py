@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python2
+
 ###############################################################################
 # Classes for parameter ranges
 ###############################################################################
@@ -10,6 +11,7 @@ class ParameterRange(object):
         self.name = name
         self.params = {}
         self.fixed = fixed
+        self.direct = direct
 
     def get(self, param):
         if param in self.params:
@@ -119,18 +121,6 @@ class FixedParameterRange(ParameterRange):
         self.name += '_%s_%f-%f' % (pRanged, pMin, pMax)
 
 
-#class Figure1Parameters(FixedParameterRange):
-
-    #def __init__(self):
-        #super(Figure1Parameters, self).__init__("Figure1Parameters", 'pS',
-                                                #2.4e-04, 2.4e-02)
-
-        #self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
-                       #'dR': (1e-04,), 'dS': (2.5e-04,),
-                       #'b': (1e-03,), 'u': (1e-03,),
-                       #'c': (0.035,), 'a': (0.5,)}
-
-
 class Figure1Parameters_old(FixedParameterRange):
 
     def __init__(self):
@@ -146,19 +136,22 @@ class Figure1Parameters_old(FixedParameterRange):
 class DirectFixedParameters(FixedParameterRange):
 
     def __init__(self, name, pRanged, pIndex, pMin, pMax):
-        super(DirectFixedParameters, self).__init__(name, fixed=True,
-            direct=True)
+        super(DirectFixedParameters, self).__init__(name, pRanged, pMin, pMax)
 
-        self.pRanged = pRanged
         self.pIndex = pIndex
         self.pName = '%s_%d' % (pRanged, pIndex)
         self.pVal = 0.0
-        self.pMin = pMin
-        self.pMax = pMax
+        self.name += '_curr_%f' % self.pVal
+        self.direct = True
 
-        self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
+
+class Figure1Parameters(DirectFixedParameters):
+
+    def __init__(self):
+        super(Figure1Parameters, self).__init__('Figure1Parameters', 'pR', 1,
+              2.4e-03, 2.4e-01)
+
+        self.params = {'pR': (2.4e-02,), 'pS': (2.4e-03,),
                        'dR': (1e-04,), 'dS': (2.5e-04,),
                        'b': (1e-03,), 'u': (1e-03,),
                        'c': (0.035,), 'a': (0.5,)}
-
-        self.name += '_curr_%f' % self.pVal
