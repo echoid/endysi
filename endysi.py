@@ -720,10 +720,12 @@ class Ensemble:
         # Calc RNA means
         names = self.experiments[0].equilSS.dtype.names
         dt = [('model', 'i4'), ('ceMean', 'f8'), ('miMean', 'f8'),
-              ('mean_ceCorr', 'f8'), ('mean_miCorr', 'f8')]
+              ('mean_ceCorr', 'f8'), ('mean_miCorr', 'f8'), ('ratio', 'f8'),
+              ('ceRxceMean', 'f8'), ('miRxmiMean', 'f8'), ('integ', 'f8')]
         self.nSSandR = np.zeros(self.size, dtype=dt)
 
         for experiment in self.experiments:
+            # calc norm'd avg steady states
             i = experiment.model.index
             self.nSSandR['model'][i - 1] = i
             miTot = 0
@@ -742,6 +744,7 @@ class Ensemble:
             self.nSSandR['miMean'][i - 1] = miTot / miCount
             self.nSSandR['ceMean'][i - 1] = ceTot / ceCount
 
+            # add correlations
             if self.method == 'ode':
                 self.nSSandR['mean_ceCorr'][i - 1] = np.mean(
                                 self.ceEquilCCs['r'])
@@ -754,13 +757,20 @@ class Ensemble:
                 if self.m > 1:
                     self.nSSandR['mean_miCorr'][i - 1] = np.mean(self.miWCCCs)
 
-        # Plot balance for the ensemble
+            # calc other measures
+            ceR = self.nSSandR['mean_ceCorr'][i - 1]
+            miR = self.nSSandR['mean_miCorr'][i - 1]
+            ceMean = self.nSSandR['ceMean'][i - 1]
+            miMean = self.nSSandR['miMean'][i - 1]
+
+            self.nSSandR['ratio'][i - 1] = ceMean / miMean
+            self.nSSandR['ceRxceMean'][i - 1] = ca = ceR * ceMean
+            self.nSSandR['miRxmiMean'][i - 1] = ma = miR * miMean
+            self.nSSandR['integ'][i - 1] = ca / ma
+
+        # write data to file
         fn = join(self.resultsDir, self.name + '_nSSandRs.csv')
         _writeDataToCSV(fn, self.nSSandR)
-
-        #fn = join(self.resultsDir, self.name + '_RNA_scatter.png')
-        #_scatterPlot(fn, self.nSSandR['ceMean'], self.nSSandR['miMean'],
-                     #False, 'average ceRNA', 'average miRNA')
 
         # Only plot if this is not part of a population run
         if self.method == 'ssa':
@@ -841,19 +851,21 @@ class Ensemble:
         # i.e., stochastic fluctuation correlations
         ceRVals = []
         miRVals = None
-        if self.m < 1:
+        if self.m > 1:
             miRVals = []
 
         for e in self.experiments:
-            if self.n <= 2:
-                ceRVals.append(e.ceEquilWCCs['r'])
-            else:
-                ceRVals.extend(e.ceEquilWCCs['r'])
+            #print(type(e.ceEquilWCCs['r'][0]))
+            #if isinstance(e.ceEquilWCCs['r'][0], np.ndarray):
+            ceRVals.extend(e.ceEquilWCCs['r'])
+            #else:
+                #ceRVals.append(e.ceEquilWCCs['r'])
 
-            if self.m == 2:
-                miRVals.append(e.miEquilWCCs['r'])
-            elif self.m > 2:
+            if self.m > 1:
+                #if isinstance(e.miEquilWCCs['r'][0], np.ndarray):
                 miRVals.extend(e.miEquilWCCs['r'])
+                #else:
+                    #miRVals.append(e.miEquilWCCs['r'])
 
         # plot and save
         fp = join(self.resultsDir, self.name + '_ceWCCs')
@@ -862,15 +874,17 @@ class Ensemble:
         fn = join(self.resultsDir, self.name + '_ceWCCs.csv')
         _writeListToCSV(fn, ceRVals, 'r')
 
-        fp = join(self.resultsDir, self.name + '_miWCCs')
-        _histogram(fp, miRVals, 'r')
+        if self.m > 1:
+            fp = join(self.resultsDir, self.name + '_miWCCs')
+            _histogram(fp, miRVals, 'r')
 
-        fn = join(self.resultsDir, self.name + '_miWCCs.csv')
-        _writeListToCSV(fn, miRVals, 'r')
+            fn = join(self.resultsDir, self.name + '_miWCCs.csv')
+            _writeListToCSV(fn, miRVals, 'r')
 
         # store rVals temporarily
         self.ceWCCCs = np.array(ceRVals)
-        self.miWCCCs = np.array(miRVals)
+        if self.m > 1:
+            self.miWCCCs = np.array(miRVals)
 
         return
 
@@ -1007,8 +1021,12 @@ class Ensemble:
                                  num=self.size)
 
             # save the range to file
-            fn = join(self.resultsDir, self.name + '_%s_range' %
-                      self.randParams.pName)
+            s = self.name
+            if self.randParams.isDirect():
+                s += '_%s_range' % self.randParams.pName
+            else:
+                s += '_range'
+            fn = join(self.resultsDir, s)
             np.savetxt(fn, pRange)
             self.pRange = pRange
 
@@ -1265,7 +1283,8 @@ class Population:
     def calcBalance(self):
         # Create a table for results
         dt = [('ens', 'i4'), ('norm avg ceRNA', 'f8'), ('norm avg miRNA', 'f8'),
-              ('avg ceCCC', 'f8'), ('avg miCCC', 'f8')]
+              ('avg ceCCC', 'f8'), ('avg miCCC', 'f8'), ('ratio', 'f8'),
+              ('ceRxceMean', 'f8'), ('miRxmiMean', 'f8'), ('integ', 'f8')]
         self.nSSandR = np.zeros(self.p, dtype=dt)
 
         # Gather means from the ensembles
@@ -1286,8 +1305,19 @@ class Population:
             if self.m > 1:
                 self.nSSandR['avg miCCC'][i] = np.mean(e.miEquilCCs['r'])
 
+            ceMean = self.nSSandR['norm avg ceRNA'][i - 1]
+            miMean = self.nSSandR['norm avg miRNA'][i - 1]
+            ceR = self.nSSandR['avg ceCCC'][i - 1]
+            miR = self.nSSandR['avg miCCC'][i - 1]
+
+            self.nSSandR['ratio'][i - 1] = ceMean / miMean
+            self.nSSandR['ceRxceMean'][i - 1] = ca = ceR * ceMean
+            self.nSSandR['miRxmiMean'][i - 1] = ma = miR * miMean
+            self.nSSandR['integ'][i - 1] = ca / ma
+
         # Save to file
-        _writeDataToCSV(join(self.resultsDir, 'normSSandR.csv'), self.nSSandR)
+        fn = join(self.resultsDir, self.name + '_normSSandR.csv')
+        _writeDataToCSV(fn, self.nSSandR)
 
         # Plot it
         fig = plt.figure()

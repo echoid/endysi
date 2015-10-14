@@ -125,7 +125,7 @@ class Figure1Parameters_old(FixedParameterRange):
 
     def __init__(self):
         super(Figure1Parameters_old, self).__init__("Figure1Parameters_old",
-              'pS', 2.4e-04, 2.4e-02)
+              'pS', 2.4e-05, 2.4e-02)
 
         self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
                        'dR': (1e-04,), 'dS': (2.5e-04,),

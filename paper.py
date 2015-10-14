@@ -39,12 +39,12 @@ def _plotData_semilogx(filename, data, xName, xLabel, yLabel, ddpi=120):
 
 
 def figure1():
-    paramRange = params.Figure1Parameters()
+    paramRange = params.Figure1Parameters_old()
 
     m = 1
     n = 2
     k = 1
-    s = 10
+    s = 1000
     outFreq = 100
     method = 'ssa'
     maxHalfLife = 70000
