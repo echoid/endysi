@@ -1408,7 +1408,7 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, randParams, linSamp=False,
     host = socket.gethostname()
     if host == 'crick':
         baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
-    elif host == 'cgic':
+    elif host == 'ogic':
         baseDir = '/data/matt/ceRNA/endysi'
 
     if p == 1:

@@ -58,7 +58,7 @@ def figure1():
     host = socket.gethostname()
     if host == 'crick':
         baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
-    elif host == 'cgic':
+    elif host == 'ogic':
         baseDir = '/data/matt/ceRNA/endysi'
 
     # make the ensemble and run it
