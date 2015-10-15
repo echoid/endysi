@@ -1405,8 +1405,11 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, randParams, linSamp=False,
 
     # Check if we're running on the lab cluster
     baseDir = None
-    if socket.gethostname() == 'crick':
+    host = socket.gethostname()
+    if host == 'crick':
         baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
+    elif host == 'cgic':
+        baseDir = '/data/matt/ceRNA/endysi'
 
     if p == 1:
         eds = Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples,
