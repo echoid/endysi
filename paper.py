@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 ###############################################################################
 # This script runs the experiments and generates the figures for the paper
