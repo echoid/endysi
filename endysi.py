@@ -607,7 +607,7 @@ class Ensemble:
         return
 
     def writeRunInfo(self):
-        with open(join(self.curRun, 'runInfo'), 'w') as riFile:
+        with open(join(self.resultsDir, 'runInfo'), 'w') as riFile:
             riFile.write('Ensemble of %d parameter sets\n' % self.size)
             riFile.write('m = %d\n' % self.m)
             riFile.write('n = %d\n' % self.n)
@@ -615,7 +615,7 @@ class Ensemble:
             riFile.write('method: %s\n' % self.method)
             riFile.write('Parameters: %s\n' % self.randParams.name)
 
-        with open(join(self.curRun, 'alpha'), 'w') as aFile:
+        with open(join(self.resultsDir, 'alpha'), 'w') as aFile:
             aFile.write('alpha=' + str(self.alpha))
 
         return
@@ -660,13 +660,17 @@ class Ensemble:
     def createDirectories(self, baseDir):
         if baseDir is None:
             self.rootDir = join(os.path.expanduser('~'),
-                                'research/results/ceRNA/endysi/' + self.name)
+                                'research/sims/ceRNA/endysi/')
         else:
-            self.rootDir = join(baseDir, self.name)
+            self.rootDir = baseDir
 
-        self.curRun = join(self.rootDir, self.timestamp)
-        self.dataDir = join(self.curRun, 'data')
-        self.resultsDir = join(self.curRun, 'results')
+        #self.runDir = join(self.rootDir, self.name)
+        bResultsDir = join(self.rootDir, 'results')
+        bDataDir = join(self.rootDir, 'data')
+        rRunDir = join(bResultsDir, self.name)
+        dRunDir = join(bDataDir, self.name)
+        self.resultsDir = join(rRunDir, self.timestamp)
+        self.dataDir = join(dRunDir, self.timestamp)
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
         return
@@ -1104,7 +1108,7 @@ class Population:
         return
 
     def writeRunInfo(self):
-        with open(join(self.curRun, 'runInfo'), 'w') as riFile:
+        with open(join(self.resultsDir, 'runInfo'), 'w') as riFile:
             riFile.write('Population of %d ensembles, each of size %d\n' %
                          (self.p, self.s))
             riFile.write('m = %d\n' % self.m)
@@ -1118,13 +1122,16 @@ class Population:
     def createDirectories(self, baseDir):
         if baseDir is None:
             self.rootDir = join(os.path.expanduser('~'),
-                            'research/results/ceRNA/endysi/' + self.name)
+                            'research/sims/ceRNA/endysi/')
         else:
             self.rootDir = join(baseDir, self.name)
 
-        self.curRun = join(self.rootDir, self.timestamp)
-        self.dataDir = join(self.curRun, 'data')
-        self.resultsDir = join(self.curRun, 'results')
+        bResultsDir = join(self.rootDir, 'results')
+        bDataDir = join(self.rootDir, 'data')
+        rRunDir = join(bResultsDir, self.name)
+        dRunDir = join(bDataDir, self.name)
+        self.resultsDir = join(rRunDir, self.timestamp)
+        self.dataDir = join(dRunDir, self.timestamp)
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
         return
