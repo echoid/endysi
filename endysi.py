@@ -177,10 +177,16 @@ class Experiment:
                            '-g ./%(name)s.net ./%(name)s.net %(outFreq)d ' + \
                            '%(tend)d'
         elif method == 'ssa':
-            self.action = 'run_network -o ./%(name)s_%(suf)s -p ssa -h ' + \
-                           '%(seed)d --cdat %(pcdat)d --fdat 0 -g ' + \
-                           './%(name)s.net ./%(name)s.net ' + \
-                           '%(outFreq)d %(tend)d'
+            if _seeding:
+                self.action = 'run_network -o ./%(name)s_%(suf)s -p ssa -h ' + \
+                               '%(seed)d --cdat %(pcdat)d --fdat 0 -g ' + \
+                               './%(name)s.net ./%(name)s.net ' + \
+                               '%(outFreq)d %(tend)d'
+            else:
+                self.action = 'run_network -o ./%(name)s_%(suf)s -p ssa ' + \
+                               '--cdat %(pcdat)d --fdat 0 -g ' + \
+                               './%(name)s.net ./%(name)s.net ' + \
+                               '%(outFreq)d %(tend)d'
 
         #nsteps = int(tEnd / outFreq)
         self.opts = {'suf': 'equil', 'tend': tEnd, 'outFreq': outFreq, 'cnt': 0,
@@ -442,10 +448,10 @@ class Experiment:
         fn = self.model.filePath + '_ceRNA_samples.csv'
         _writeDataToCSV(fn, molData, frmt=('%.18e', '%.18e'))
 
-        t = 'ceRNA1 vs. ceRNA2'
-        fn = join(self.model.plotDir, self.model.name + '_ceRNA_scatter.png')
-        _scatterPlot(fn, molData['ceRNA1'], molData['ceRNA2'], False,
-                     'ceRNA1', 'ceRNA2', title=t)
+        #t = 'ceRNA1 vs. ceRNA2'
+        #fn = join(self.model.plotDir, self.model.name + '_ceRNA_scatter.png')
+        #_scatterPlot(fn, molData['ceRNA1'], molData['ceRNA2'], False,
+                     #'ceRNA1', 'ceRNA2', title=t)
 
     def makeScatterPlots(self):
         # gather params
@@ -784,30 +790,25 @@ class Ensemble:
 
             if self.m > 1:
                 plt.scatter(self.nSSandR['miMean'],
-                    self.nSSandR['mean_miCorr'], color='r', label='miRNA')
+                        self.nSSandR['mean_miCorr'], color='r', label='miRNA')
 
-                cType = ''
-                if self.method == 'ode':
-                    cType = 'CCC'
-                else:
-                    cType = 'WCC'
+            cType = ''
+            if self.method == 'ode':
+                cType = 'CCC'
+            else:
+                cType = 'WCC'
 
-                t = 'Normalized Average RNA vs Average %s Correlation' % cType
-                fig.suptitle(t)
-                plt.xlabel('Average RNA steady state')
+            t = 'Normalized Average RNA vs Average %s Correlation' % cType
+            fig.suptitle(t)
+            plt.xlabel('Average RNA steady state')
 
-                yLabel = 'Average'
-                if self.method == 'ode':
-                    yLabel += 'CCC'
-                else:
-                    yLabel += 'WCC'
+            yLabel = 'Average ' + cType
+            plt.ylabel(yLabel)
 
-                plt.ylabel(yLabel)
-
-                # Save it
-                fn = join(self.resultsDir, self.name + '_nSSand%s.png' % cType)
-                plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
-                plt.close(fig)
+            # Save it
+            fn = join(self.resultsDir, self.name + '_nSSand%s.png' % cType)
+            plt.savefig(fn, dpi=_dpi, bbox_inches='tight')
+            plt.close(fig)
 
         # calc overall mean
         self.ceMean = np.mean(self.nSSandR['ceMean'])
@@ -872,15 +873,18 @@ class Ensemble:
                     #miRVals.append(e.miEquilWCCs['r'])
 
         # plot and save
-        fp = join(self.resultsDir, self.name + '_ceWCCs')
-        _histogram(fp, ceRVals, 'r')
+        # Only plot it this is not part of a population
+        if self.method == 'ssa':
+            fp = join(self.resultsDir, self.name + '_ceWCCs')
+            _histogram(fp, ceRVals, 'r')
 
         fn = join(self.resultsDir, self.name + '_ceWCCs.csv')
         _writeListToCSV(fn, ceRVals, 'r')
 
         if self.m > 1:
-            fp = join(self.resultsDir, self.name + '_miWCCs')
-            _histogram(fp, miRVals, 'r')
+            if self.method == 'ssa':
+                fp = join(self.resultsDir, self.name + '_miWCCs')
+                _histogram(fp, miRVals, 'r')
 
             fn = join(self.resultsDir, self.name + '_miWCCs.csv')
             _writeListToCSV(fn, miRVals, 'r')
@@ -1034,6 +1038,10 @@ class Ensemble:
             np.savetxt(fn, pRange)
             self.pRange = pRange
 
+        elif self.randParams.isSpecific():
+            pRange = self.randParams.ps
+            self.pRange = pRange
+
         tStart = time.time()
         for i in range(1, self.size + 1):
             dDir = join(self.dataDir, 'model%d' % i)
@@ -1047,8 +1055,11 @@ class Ensemble:
             if pRange is not None:
                 if self.randParams.isDirect():
                     self.randParams.pVal = pRange[i - 1]
-                else:
+                elif (self.randParams.isFixed()
+                          and not self.randParams.isDirect()):
                     self.randParams.set(self.randParams.pRanged, pRange[i - 1])
+                elif self.randParams.isSpecific():
+                    self.randParams.set(self.randParams.pSet, pRange[i - 1])
 
             model = bngl.CernetModel(dDir, self.m, self.n, self.k, i,
                                      self.randParams, alpha=self.alpha,
@@ -1399,7 +1410,7 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, randParams, linSamp=False,
     nSamples = 1
 
     if method == 'ssa':
-        nSamples = 100
+        nSamples = 1000
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
@@ -1417,10 +1428,10 @@ def makeRocketGoNow(m, n, k, s, p, outFreq, method, randParams, linSamp=False,
                        baseDir=baseDir)
         eds.runAll()
     else:
-        p = Population(p, m, n, k, s, method, tEnd, outFreq, randParams,
+        pop = Population(p, m, n, k, s, method, tEnd, outFreq, randParams,
                        linearSampling=linSamp, baseDir=baseDir,
                        rangingAlpha=rangeAlpha)
-        p.runAll()
+        pop.runAll()
 
     return
 

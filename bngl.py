@@ -180,7 +180,7 @@ class CernetModel:
         # Production rules
         for mol in self.ceRNAs:
             # Choose param val
-            if paramRange.isFixed():
+            if paramRange.isFixed() or paramRange.isSpecific():
                 pVal = paramRange.getMin('pR')
             else:
                 minVal = paramRange.getMin('pR')
@@ -209,7 +209,7 @@ class CernetModel:
         count = 0
         for mol in self.miRNAs:
             # Choose param val
-            if paramRange.isFixed():
+            if paramRange.isFixed() or paramRange.isSpecific():
                 pVal = paramRange.getMin('pS')
             else:
                 minVal = paramRange.getMin('pS')
@@ -239,7 +239,7 @@ class CernetModel:
         count = 0
         for mol in self.ceRNAs:
             # Choose param val
-            if paramRange.isFixed():
+            if paramRange.isFixed() or paramRange.isSpecific():
                 pVal = paramRange.getMin('dR')
             else:
                 minVal = paramRange.getMin('dR')
@@ -267,7 +267,7 @@ class CernetModel:
         count = 0
         for mol in self.miRNAs:
             # Choose param val
-            if paramRange.isFixed():
+            if paramRange.isFixed() or paramRange.isSpecific():
                 pVal = paramRange.getMin('dS')
             else:
                 minVal = paramRange.getMin('dS')
@@ -298,7 +298,7 @@ class CernetModel:
             molX = comp.molX
             molY = comp.molY
 
-            if paramRange.isFixed():
+            if paramRange.isFixed() or paramRange.isSpecific():
                 bRand = paramRange.getMin('b')
                 uRand = paramRange.getMin('u')
             else:
@@ -343,7 +343,7 @@ class CernetModel:
             molX = comp.molX
             molY = comp.molY
 
-            if paramRange.isFixed():
+            if paramRange.isFixed() or paramRange.isSpecific():
                 aRand = paramRange.getMin('a')
                 cRand = paramRange.getMin('c')
             else:
