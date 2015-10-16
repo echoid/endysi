@@ -7,11 +7,12 @@ from __future__ import print_function
 
 
 class ParameterRange(object):
-    def __init__(self, name, fixed=False, direct=False):
+    def __init__(self, name, fixed=False, direct=False, specific=False):
         self.name = name
         self.params = {}
         self.fixed = fixed
         self.direct = direct
+        self.specific = specific
 
     def get(self, param):
         if param in self.params:
@@ -50,6 +51,9 @@ class ParameterRange(object):
     def isDirect(self):
         return self.direct
 
+    def isSpecific(self):
+        return self.specific
+
 
 class NitzanParameters(ParameterRange):
     """This class represents the parameter ranges for ceRNA networks from
@@ -78,7 +82,7 @@ class NitzanParametersReduced(NitzanParameters):
 
     def __init__(self):
         super(NitzanParametersReduced, self).__init__()
-        self.set('pS', (2.4e-04, 2.4e-02))
+        self.set('pS', (2.4e-05, 2.4e-02))
         self.name = 'NitzanParametersReduced'
 
 
@@ -121,18 +125,6 @@ class FixedParameterRange(ParameterRange):
         self.name += '_%s_%f-%f' % (pRanged, pMin, pMax)
 
 
-class Figure1Parameters_old(FixedParameterRange):
-
-    def __init__(self):
-        super(Figure1Parameters_old, self).__init__("Figure1Parameters_old",
-              'pS', 2.4e-05, 2.4e-02)
-
-        self.params = {'pR': (2.4e-02,), 'pS': (2.4e-02,),
-                       'dR': (1e-04,), 'dS': (2.5e-04,),
-                       'b': (1e-03,), 'u': (1e-03,),
-                       'c': (0.035,), 'a': (0.5,)}
-
-
 class DirectFixedParameters(FixedParameterRange):
 
     def __init__(self, name, pRanged, pIndex, pMin, pMax):
@@ -145,13 +137,44 @@ class DirectFixedParameters(FixedParameterRange):
         self.direct = True
 
 
-class Figure1Parameters(DirectFixedParameters):
+class SpecificParameterRange(ParameterRange):
+
+    def __init__(self, name, pSet):
+        super(SpecificParameterRange, self).__init__(name, specific=True)
+
+        self.pSet = pSet
+
+
+###############################################################################
+# Classes for the paper
+###############################################################################
+
+class Figure1Parameters(FixedParameterRange):
 
     def __init__(self):
-        super(Figure1Parameters, self).__init__('Figure1Parameters', 'pR', 1,
-              2.4e-03, 2.4e-01)
+        super(Figure1Parameters, self).__init__('Figure1Parameters', 'pS',
+              1.0e-06, 1.0)
 
         self.params = {'pR': (2.4e-02,), 'pS': (2.4e-03,),
                        'dR': (1e-04,), 'dS': (2.5e-04,),
                        'b': (1e-03,), 'u': (1e-03,),
                        'c': (0.035,), 'a': (0.5,)}
+
+#class Figure1Parameters(SpecificParameterRange):
+
+    #def __init__(self):
+        #super(Figure1Parameters, self).__init__('Figure1Parameters', 'pS')
+
+        #self.ps = [0.000024, 5.20652044412444E-05, 0.0001054032, 0.0004565523,
+               #0.0009973093, 0.0019369488, 0.0024, 0.0026257313,
+               #0.0026807684, 0.0029126971, 0.003208761, 0.0035105601,
+               #0.0078836577, 0.0101821354, 0.0106134576, 0.0116117032,
+               #0.0153114403, 0.018200827, 0.0236703803]
+
+        #self.params = {'pR': (2.4e-02,), 'pS': (2.4e-2,),
+                       #'dR': (1e-04,), 'dS': (2.5e-04,),
+                       #'b': (1e-03,), 'u': (1e-03,),
+                       #'c': (0.035,), 'a': (0.5,)}
+
+        #self.name += '_pS'
+#

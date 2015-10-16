@@ -39,17 +39,17 @@ def _plotData_semilogx(filename, data, xName, xLabel, yLabel, ddpi=120):
 
 
 def figure1():
-    paramRange = params.Figure1Parameters_old()
+    paramRange = params.Figure1Parameters()
 
     m = 1
     n = 2
     k = 1
     s = 1000
-    outFreq = 100
+    outFreq = 10000
     method = 'ssa'
     maxHalfLife = 70000
     halfLifeMults = 2
-    nSamples = 10
+    nSamples = 1000
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
@@ -68,13 +68,13 @@ def figure1():
 
     # Plot additional results
     # Make a table for the data
-    dt = [('ceRNA1 trans rate', 'f8'), ('norm ceRNA1', 'f8'),
+    dt = [('miRNA trans rate', 'f8'), ('norm ceRNA1', 'f8'),
           ('norm ceRNA2', 'f8'), ('norm miRNA', 'f8'), ('pearson r', 'f8')]
 
     data = np.zeros(s, dtype=dt)
 
     # Gather the data
-    data['ceRNA1 trans rate'] = ens.pRange
+    data['miRNA trans rate'] = ens.pRange
 
     # Normalize steady states
     for i in range(s):
@@ -97,8 +97,8 @@ def figure1():
 
     # Plot data
     fn = join(ens.resultsDir, ens.name + '_normSS_and_R.png')
-    _plotData_semilogx(fn, data, 'ceRNA1 trans rate',
-                       'ceRNA1 transcription rate', '')
+    _plotData_semilogx(fn, data, 'miRNA trans rate',
+                       'miRNA transcription rate', '')
 
 if __name__ == '__main__':
     import argparse
