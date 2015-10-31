@@ -673,10 +673,10 @@ class Ensemble:
         #self.runDir = join(self.rootDir, self.name)
         bResultsDir = join(self.rootDir, 'results')
         bDataDir = join(self.rootDir, 'data')
-        rRunDir = join(bResultsDir, self.name)
-        dRunDir = join(bDataDir, self.name)
-        self.resultsDir = join(rRunDir, self.timestamp)
-        self.dataDir = join(dRunDir, self.timestamp)
+        self.rRunDir = join(bResultsDir, self.name)
+        self.dRunDir = join(bDataDir, self.name)
+        self.resultsDir = join(self.rRunDir, self.timestamp)
+        self.dataDir = join(self.dRunDir, self.timestamp)
         makeDirs(self.dataDir)
         makeDirs(self.resultsDir)
         return
@@ -1367,10 +1367,10 @@ class Population:
             else:
                 ceCCs.extend(ceda['r'])
 
-        fp = join(self.resultsDir, self.name + '_ceCCs')
+        fp = join(self.resultsDir, self.name + '_ceCCCs')
         _histogram(fp, ceCCs, 'r')
 
-        fn = join(self.resultsDir, self.name + '_ceCCs.csv')
+        fn = join(self.resultsDir, self.name + '_ceCCCs.csv')
         _writeListToCSV(fn, ceCCs, 'r')
 
         if self.m >= 2:
@@ -1384,10 +1384,10 @@ class Population:
                     else:
                         miCCs.extend(mida['r'])
 
-            fp = join(self.resultsDir, self.name + '_miCCs')
+            fp = join(self.resultsDir, self.name + '_miCCCs')
             _histogram(fp, miCCs, 'r')
 
-            fn = join(self.resultsDir, self.name + '_miCCs.csv')
+            fn = join(self.resultsDir, self.name + '_miCCCs.csv')
             _writeListToCSV(fn, miCCs, 'r')
 
         return

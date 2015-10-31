@@ -82,7 +82,7 @@ class NitzanParametersReduced(NitzanParameters):
 
     def __init__(self):
         super(NitzanParametersReduced, self).__init__()
-        self.set('pS', (2.4e-05, 2.4e-02))
+        self.set('pS', (2.4e-04, 2.4e-02))
         self.name = 'NitzanParametersReduced'
 
 

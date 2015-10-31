@@ -53,7 +53,7 @@ def figure1():
 
     tEnd = maxHalfLife * halfLifeMults * nSamples
 
-    # Check if we're running on the lab cluster
+    # Check where we're running
     baseDir = None
     host = socket.gethostname()
     if host == 'crick':
@@ -100,12 +100,95 @@ def figure1():
     _plotData_semilogx(fn, data, 'miRNA trans rate',
                        'miRNA transcription rate', '')
 
+
+def figure2(part):
+    # Check where we're running
+    baseDir = None
+    host = socket.gethostname()
+    if host == 'crick':
+        baseDir = '/ohri/projects/perkins/mattm/ceRNA/endysi'
+    elif host == 'ogic':
+        baseDir = '/data/matt/ceRNA/endysi'
+
+    if part == 1:
+        m = 1
+        n = 2
+        k = 1
+        s = 100000
+        outFreq = 5000
+        method = 'ode'
+        maxHalfLife = 70000
+        halfLifeMults = 2
+        nSamples = 1
+
+        tEnd = maxHalfLife * halfLifeMults * nSamples
+
+        corrs = []
+        pMin = 1.0e-6
+        pMax = 1.0e-4
+        resultsDir = None
+        for i in range(5):
+            paramRange = params.NitzanParametersCustom(pMin, pMax)
+            pMin *= 10.0
+            pMax *= 10.0
+
+            # make the ensemble and run it
+            ens = endysi.Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples,
+                                  paramRange, baseDir=baseDir, name='Figure2.1')
+            ens.runAll()
+
+            corrs.append(np.mean(ens.ceEquilCCs['r']))
+            if resultsDir is None:
+                resultsDir = ens.rRunDir
+
+        fn = join(resultsDir, 'Figure2_ceCCCs_%s.csv' % genTimeString())
+        np.savetxt(fn, np.array(corrs))
+
+    if part == 2:
+        m = 1
+        n = 2
+        k = 1
+        s = 1000
+        outFreq = 10000
+        method = 'ssa'
+        maxHalfLife = 70000
+        halfLifeMults = 2
+        nSamples = 1000
+
+        tEnd = maxHalfLife * halfLifeMults * nSamples
+
+        corrs = []
+        pMin = 1.0e-6
+        pMax = 1.0e-4
+        resultsDir = None
+        for i in range(5):
+            paramRange = params.NitzanParametersCustom(pMin, pMax)
+            pMin *= 10.0
+            pMax *= 10.0
+
+            # make the ensemble and run it
+            ens = endysi.Ensemble(m, n, k, s, method, tEnd, outFreq, nSamples,
+                                  paramRange, baseDir=baseDir, name='Figure2.2')
+            ens.runAll()
+
+            corrs.append(np.mean(ens.ceWCCCs))
+            if resultsDir is None:
+                resultsDir = ens.rRunDir
+
+        fn = join(resultsDir, 'Figure2_ceWCCs_%s.csv' % genTimeString())
+        np.savetxt(fn, np.array(corrs))
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--figure', type=int, help='The figure to generate')
+    parser.add_argument('--figure', type=str, help='The figure to generate')
 
     args = parser.parse_args()
 
-    if args.figure == 1:
+    if args.figure == '1':
         figure1()
+    elif args.figure == '2p1':
+        figure2(1)
+    elif args.figure == '2p2':
+        figure2(2)
