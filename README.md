@@ -63,9 +63,12 @@ have the above dependencies installed.
     Gillespie simulation).
 
 3. When it runs, the above command will create a new directory for the 
-raw data and results in ~/research/results/ceRNA/endysi.  This is ongoing
+raw data and results in ~/research/results/ceRNA/endysi.  ~~This is ongoing
 and as yet unpublished research, so I'm reluctant to say too much about
-the details.  (Which is to say, please don't scoop me!)
+the details.  (Which is to say, please don't scoop me!)~~ The project is now 
+completed and published, so go nuts (which, I know, is highly unlikely.
+There's probably no one even reading this.  Are you?  Well, away with you!
+There's much better code out there than this ;))
 
 ### Future plans
 
